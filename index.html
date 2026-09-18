@@ -60,9 +60,16 @@ button{font-family:inherit;cursor:pointer}
   font-size:10.5px;font-weight:400;letter-spacing:.2em;color:#8d8374;
   text-transform:uppercase;opacity:0;transition:opacity 1s ease .3s}
 #visitors.on{opacity:1}
-#visitors b{display:block;font-family:var(--serif);font-size:36px;font-weight:700;
+#visitors b{display:block;font-family:Georgia,'Times New Roman',serif;font-size:36px;font-weight:800;
   letter-spacing:.02em;color:var(--brass);line-height:1.1;margin-bottom:5px;
-  text-transform:none;text-shadow:0 2px 22px rgba(216,184,120,.35)}
+  text-transform:none;text-shadow:0 2px 22px rgba(216,184,120,.35);
+  /* every digit the same width, so the number does not jiggle as it climbs */
+  font-variant-numeric:tabular-nums;font-feature-settings:'tnum' 1}
+#visitors b.settled{animation:settle 1s ease-out}
+@keyframes settle{
+  0%{text-shadow:0 2px 22px rgba(216,184,120,.35);transform:scale(1)}
+  30%{text-shadow:0 2px 40px rgba(216,184,120,.8);transform:scale(1.04)}
+  100%{text-shadow:0 2px 22px rgba(216,184,120,.35);transform:scale(1)}}
 #emptyNote{display:none;font-size:12.5px;color:#c9b489;line-height:1.7;margin:18px auto 0;max-width:330px}
 #emptyNote a{color:var(--brass)}
 kbd{background:#241e18;border:1px solid #453a2c;border-radius:3px;padding:1px 6px;font-size:11px;color:#cdbfa8}
@@ -468,6 +475,22 @@ let db=null, ART=[];
    gallery to writes. A browser counts once every six hours, so a reload
    or a second look on the same evening is not a second visitor. */
 const VISIT_KEY='shator-visited';
+/* Count up to the figure rather than snapping to it. Eases out, so it
+   races at first and settles gently on the real number. */
+function rollTo(el,target){
+  if(!el) return;
+  const still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const land=()=>{ el.textContent=target.toLocaleString(); el.classList.add('settled'); };
+  if(still||!(target>0)||!window.requestAnimationFrame){ land(); return; }
+  const dur=1700, t0=(window.performance&&performance.now)?performance.now():Date.now();
+  const tick=now=>{
+    const p=Math.min(1,((now||Date.now())-t0)/dur);
+    const e=1-Math.pow(1-p,3);
+    if(p<1){ el.textContent=Math.round(target*e).toLocaleString(); requestAnimationFrame(tick); }
+    else land();
+  };
+  requestAnimationFrame(tick);
+}
 async function countVisit(){
   const el=document.querySelector('#visitors');
   const cfg=readCfg();
@@ -490,8 +513,9 @@ async function countVisit(){
     if(!r.ok) return;                       // setup SQL not run yet: stay quiet
     const n=await r.json();
     if(typeof n!=='number'||!(n>0)) return;
-    el.innerHTML='<b>'+n.toLocaleString()+'</b>visitors so far';
+    el.innerHTML='<b>0</b>visitors so far';
     el.classList.add('on');
+    setTimeout(()=>rollTo(el.querySelector('b'),n),420);
     if(bump){ try{ localStorage.setItem(VISIT_KEY,String(Date.now())); }catch(e){} }
   }catch(e){}
 }
