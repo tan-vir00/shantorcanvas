@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#241c5c">
+<title>Curator — Shator Canvas</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<style>
+/* ---------------------------------------------------------------
+   Palette drawn from rickshaw-art and alpona pigments — the loud,
+   flat colours a Bengali painter actually works in. The gallery is
+   a dim museum; this is the workshop behind it, so it is bright.
+   Every colour here carries meaning: blue is a tall picture, green
+   a wide one, vermilion destroys, magenta commits.
+   --------------------------------------------------------------- */
+:root{
+  --ink:#1a1412; --paper:#fffbf2; --card:#ffffff;
+  --indigo:#241c5c; --magenta:#d01e58; --marigold:#f0a419;
+  --kingfisher:#1668a6; --parrot:#1e7a38; --vermilion:#c4361a;
+  --rule:rgba(26,20,18,.14);
+  --display:'Fraunces',Georgia,'Times New Roman',serif;
+  --ui:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--ui);
+  font-size:15px;line-height:1.5;-webkit-tap-highlight-color:transparent;padding-bottom:48px}
+button{font-family:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--magenta);outline-offset:2px}
+a{color:var(--magenta)}
+
+/* ---------- header ---------- */
+header{position:sticky;top:0;z-index:30;background:var(--indigo);color:#fff8ec}
+.wrap{max-width:1000px;margin:0 auto;padding:0 20px}
+.headrow{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;
+  padding:calc(env(safe-area-inset-top,0px) + 18px) 20px 16px}
+h1{font-family:var(--display);font-size:clamp(28px,6vw,40px);font-weight:600;
+  margin:0;line-height:.95;letter-spacing:-.015em}
+#tally{font-size:13px;color:#c5bce8;margin:6px 0 0}
+header nav{margin-left:auto}
+.ghost{display:inline-block;border:2px solid #7c6fd4;color:#fff8ec;background:transparent;
+  padding:9px 16px;border-radius:999px;font-size:13.5px;text-decoration:none;font-weight:500}
+.ghost:hover{background:#7c6fd4;color:#1a1030}
+/* the one flourish: a strip of wet pigment under the masthead */
+.pigments{display:flex;height:7px}
+.pigments i{flex:1}
+
+main{max-width:1000px;margin:0 auto;padding:30px 20px 0}
+section{margin-bottom:42px}
+h2{font-family:var(--display);font-size:24px;font-weight:600;margin:0 0 5px;
+  display:flex;align-items:center;gap:10px;letter-spacing:-.01em}
+h2 .chip{width:15px;height:15px;border-radius:4px;flex:none}
+.sub{font-size:14px;color:#5e534e;line-height:1.6;margin:0 0 18px;max-width:64ch}
+
+/* ---------- buttons ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  background:var(--card);border:2px solid var(--ink);color:var(--ink);
+  padding:10px 16px;border-radius:999px;font-size:13.5px;font-weight:500;
+  transition:background .15s,color .15s}
+.btn:hover{background:var(--ink);color:var(--paper)}
+.btn.solid{background:var(--magenta);border-color:var(--magenta);color:#fff}
+.btn.solid:hover{background:#a81646;border-color:#a81646}
+.btn.danger{border-color:var(--vermilion);color:var(--vermilion)}
+.btn.danger:hover{background:var(--vermilion);color:#fff}
+.btn[disabled]{opacity:.4;cursor:not-allowed}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap}
+
+/* ---------- drop zone ---------- */
+#drop{border:3px dashed var(--magenta);border-radius:14px;padding:38px 20px;text-align:center;
+  color:#5e534e;font-size:15px;line-height:1.9;background:var(--card);transition:background .18s}
+#drop.hot{background:#ffe9f0;color:var(--ink)}
+#drop b{color:var(--magenta);font-weight:600}
+
+/* ---------- section headings, mirroring the gallery's three rooms ---------- */
+.cathead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;
+  margin:26px 0 4px;padding-bottom:9px;border-bottom:3px solid var(--c)}
+.cathead:first-child{margin-top:0}
+.cathead h3{font-family:var(--display);font-size:22px;font-weight:600;margin:0;color:var(--c)}
+.cathead span{font-size:13px;color:#5e534e}
+.catempty{font-size:14px;color:#8a7f79;margin:6px 0 4px;font-style:italic}
+
+/* ---------- the list ---------- */
+#list{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;gap:13px;align-items:center;background:var(--card);
+  border:1px solid var(--rule);border-left:7px solid var(--c,var(--marigold));
+  border-radius:10px;padding:11px 14px 11px 11px}
+.row.sel{border-color:var(--magenta);border-left-color:var(--c,var(--magenta))}
+.ord{font-family:var(--display);font-size:18px;font-weight:600;color:var(--c,var(--ink));
+  width:26px;text-align:center;flex:none}
+.thumb{width:66px;height:66px;flex:none;background:#f2ece1;border-radius:7px;
+  overflow:hidden;display:flex;align-items:center;justify-content:center}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.meta{flex:1;min-width:0}
+.meta b{display:block;font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta span{display:block;font-size:12.5px;color:#6b605a;margin-top:3px;
+  font-family:ui-monospace,Menlo,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* blue means a tall picture, green means a wide one — the same
+   coding is used on the icons, so shape is readable at a glance */
+.seg{display:flex;gap:6px;flex:none}
+.seg button{background:var(--card);border:2px solid var(--rule);color:#6b605a;
+  padding:7px 11px;border-radius:999px;font-size:12.5px;font-weight:500;
+  display:flex;align-items:center;gap:6px}
+.seg button:hover{border-color:#9d928c}
+.seg button.on[data-o=portrait]{background:var(--kingfisher);border-color:var(--kingfisher);color:#fff}
+.seg button.on[data-o=landscape]{background:var(--parrot);border-color:var(--parrot);color:#fff}
+.seg i{display:block;border:2px solid currentColor;border-radius:2px}
+.seg i.v{width:10px;height:14px}
+.seg i.h{width:15px;height:10px}
+
+.acts{display:flex;gap:6px;flex:none}
+.acts button{background:var(--card);border:2px solid var(--rule);color:#6b605a;
+  width:36px;height:36px;border-radius:999px;font-size:14px;line-height:1;padding:0}
+.acts button:hover{border-color:var(--indigo);color:var(--indigo)}
+.acts button.del:hover{border-color:var(--vermilion);color:var(--vermilion);background:#fdece9}
+.acts button.star{font-size:16px}
+.acts button.star.on{background:var(--marigold);border-color:var(--marigold);color:#3d2a04}
+.acts button.star:hover{border-color:var(--marigold);color:#a8720a}
+.row.win{box-shadow:inset 0 0 0 2px rgba(240,164,25,.5)}
+
+@media (max-width:760px){
+  .row{flex-wrap:wrap}
+  .meta{flex-basis:calc(100% - 110px)}
+  .seg{margin-left:46px}
+  .acts{margin-left:auto}
+}
+
+/* ---------- editor sheet ---------- */
+#editor{position:fixed;inset:auto 0 0 0;z-index:40;background:var(--paper);
+  border-top:7px solid var(--marigold);border-radius:18px 18px 0 0;
+  box-shadow:0 -14px 40px rgba(26,20,18,.22);
+  max-height:88vh;overflow-y:auto;transform:translateY(103%);
+  transition:transform .3s cubic-bezier(.4,0,.2,1);
+  padding:20px 20px calc(env(safe-area-inset-bottom,0px) + 26px)}
+#editor.on{transform:none}
+#editor .wrap{max-width:620px;padding:0}
+.ehead{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.ehead h3{font-family:var(--display);font-size:25px;margin:0;font-weight:600;flex:1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ehead button{background:var(--card);border:2px solid var(--rule);color:#6b605a;
+  width:38px;height:38px;border-radius:999px;font-size:20px;line-height:1;padding:0;flex:none}
+.ehead button:hover{border-color:var(--ink);color:var(--ink)}
+.preview{height:190px;background:var(--card);border:1px solid var(--rule);border-radius:10px;
+  display:flex;align-items:center;justify-content:center;margin-bottom:18px;
+  overflow:hidden;color:#9d928c;font-size:14px}
+.preview img{max-width:100%;max-height:100%;object-fit:contain}
+label.f{display:block;margin-bottom:14px}
+label.f em{display:block;font-style:normal;font-size:12.5px;color:#5e534e;font-weight:500;margin-bottom:5px}
+input.t,select.t{width:100%;background:var(--card);border:2px solid var(--rule);color:var(--ink);
+  padding:11px 13px;border-radius:9px;font-size:15px;font-family:inherit}
+input.t:focus,select.t:focus{border-color:var(--kingfisher);outline:none}
+.cols{display:flex;gap:12px}
+.cols>*{flex:1;min-width:0}
+
+/* ---------- cloud ---------- */
+pre{white-space:pre;overflow-x:auto;background:var(--indigo);color:#d6cdf5;
+  border-radius:10px;padding:16px;font:12px/1.65 ui-monospace,Menlo,monospace;
+  display:none;margin-top:14px}
+pre.on{display:block}
+.dot{width:11px;height:11px;border-radius:50%;background:#c6bbb4;display:inline-block;flex:none}
+.dot.live{background:var(--parrot);box-shadow:0 0 0 4px rgba(30,122,56,.18)}
+
+#empty{text-align:center;color:#6b605a;padding:46px 20px;font-size:15px;line-height:1.9;
+  background:var(--card);border:1px solid var(--rule);border-radius:12px}
+/* ---------- the door ---------- */
+#gate{position:fixed;inset:0;z-index:200;background:var(--indigo);color:#fff8ec;
+  display:flex;align-items:center;justify-content:center;padding:24px;text-align:center}
+#gate.off{display:none}
+#gateBox{max-width:340px;width:100%}
+#gateBox h2{display:block;font-size:30px;margin:0 0 6px;color:#fff8ec}
+#gateBox p{font-size:13.5px;color:#c5bce8;margin:0 0 20px;line-height:1.6}
+#gatePass{width:100%;padding:13px 15px;border-radius:10px;border:2px solid #7c6fd4;
+  background:#1b1447;color:#fff8ec;font-size:16px;font-family:inherit;text-align:center;letter-spacing:.1em}
+#gatePass::placeholder{color:#7f74bd;letter-spacing:0}
+#gateGo{margin-top:12px;width:100%;background:var(--magenta);border:2px solid var(--magenta);
+  color:#fff;padding:12px;border-radius:999px;font-size:14.5px;font-weight:500}
+#gateNo{font-size:13px;color:#ff9db8;margin:12px 0 0;min-height:18px}
+
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(16px);z-index:90;
+  background:var(--ink);color:var(--paper);padding:13px 22px;border-radius:999px;
+  font-size:14px;opacity:0;pointer-events:none;transition:opacity .22s,transform .22s;
+  max-width:88vw;text-align:center;box-shadow:0 8px 24px rgba(26,20,18,.3)}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+#bar{position:fixed;left:0;top:0;height:4px;width:0;z-index:95;transition:width .2s;
+  background:linear-gradient(90deg,var(--magenta),var(--marigold),var(--parrot),var(--kingfisher))}
+@media (prefers-reduced-motion:reduce){*{transition-duration:.01ms !important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="headrow">
+    <div>
+      <h1>Curator</h1>
+      <p id="tally">Loading…</p>
+    </div>
+    <nav><a class="ghost" href="index.html">Open gallery</a></nav>
+  </div>
+  <div class="pigments">
+    <i style="background:#d01e58"></i><i style="background:#f0a419"></i>
+    <i style="background:#1e7a38"></i><i style="background:#1668a6"></i>
+    <i style="background:#c4361a"></i><i style="background:#7c6fd4"></i>
+  </div>
+</header>
+
+<div id="bar"></div>
+
+<main>
+
+<section>
+  <h2><span class="chip" style="background:#d01e58"></span>Add artwork</h2>
+  <p class="sub">Drop in as many pictures as you like — there is no limit, and the gallery builds itself around however many you add. Each picture's shape is detected on upload; you can change it any time.</p>
+  <label class="f" style="max-width:340px"><em>Add them to</em>
+    <select class="t" id="newCat">
+      <option value="junior">Class 1-5</option>
+      <option value="senior">Class 6-12</option>
+      <option value="campus">Campus</option>
+    </select>
+  </label>
+  <div id="drop">
+    <b>Drop pictures here</b><br>
+    or <b id="pick" style="cursor:pointer;text-decoration:underline">browse your files</b>
+  </div>
+</section>
+
+<section>
+  <h2><span class="chip" style="background:#f0a419"></span>The collection</h2>
+  <p class="sub">The order here is the order visitors walk past them. Use ↑ ↓ to rearrange.</p>
+  <div class="btnrow" id="bulkRow" style="margin-bottom:12px">
+    <button class="btn" id="exportBtn">Export collection.json</button>
+    <button class="btn" id="importBtn">Import</button>
+    <button class="btn danger" id="clearBtn">Delete everything</button>
+  </div>
+  <div id="list"></div>
+  <div id="empty">The walls are bare.<br>Drop your first pictures in above and they appear here.</div>
+</section>
+
+<section>
+  <h2><span class="dot" id="sbDot"></span>Cloud library</h2>
+  <p class="sub" id="sbSub">Checking the cloud…</p>
+  <div class="btnrow">
+    <button class="btn" id="sbPush">Upload everything</button>
+    <button class="btn" id="sbPull">Load from cloud</button>
+    <button class="btn" id="sqlBtn">Show one-time setup SQL</button>
+    <button class="btn" id="advBtn">Change project</button>
+  </div>
+  <div id="adv" style="display:none;margin-top:14px">
+    <label class="f"><em>Project URL</em><input class="t" id="sbUrl" placeholder="https://yourproject.supabase.co" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
+    <label class="f"><em>Anon public key</em><input class="t" id="sbKey" placeholder="eyJhbGciOi…" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
+    <div class="btnrow">
+      <button class="btn solid" id="sbConnect">Use this project</button>
+      <button class="btn danger" id="forgetBtn">Back to the built-in project</button>
+    </div>
+  </div>
+  <pre id="sql"></pre>
+</section>
+
+</main>
+
+<div id="editor"><div class="wrap">
+  <div class="ehead">
+    <h3 id="eTitle">Artwork</h3>
+    <button id="eClose" aria-label="Close">×</button>
+  </div>
+  <div class="preview" id="ePrev"></div>
+  <label class="f"><em>File name — shown on the wall label</em><input class="t" id="eFile" placeholder="participant-name.jpg"></label>
+  <label class="f"><em>Title</em><input class="t" id="eName" placeholder="Untitled"></label>
+  <div class="cols">
+    <label class="f"><em>Artist</em><input class="t" id="eArtist" placeholder="Shanto"></label>
+    <label class="f"><em>Year</em><input class="t" id="eYear" placeholder="2026"></label>
+  </div>
+  <label class="f"><em>Medium</em><input class="t" id="eMedium" placeholder="Oil on canvas"></label>
+  <label class="f"><em>Section</em><select class="t" id="eCat"></select></label>
+  <label class="f"><em>Hangs as</em>
+    <select class="t" id="eOrient">
+      <option value="portrait">Vertical — tall frame</option>
+      <option value="landscape">Horizontal — wide frame</option>
+    </select>
+  </label>
+  <div class="btnrow">
+    <button class="btn solid" id="eSave">Save</button>
+    <button class="btn" id="eReplace">Replace picture</button>
+    <button class="btn danger" id="eDelete">Delete</button>
+  </div>
+</div></div>
+
+<div id="toast"></div>
+<input type="file" id="fileMulti" accept="image/*" multiple hidden>
+<input type="file" id="fileOne" accept="image/*" hidden>
+<input type="file" id="fileJson" accept="application/json,.json" hidden>
+
+<div id="gate"><div id="gateBox">
+  <h2>Shator Canvas</h2>
+  <p>Curator dashboard. Enter the password to hang, name and publish the artwork.</p>
+  <input id="gatePass" type="password" placeholder="Password" autocomplete="current-password"
+         autocapitalize="off" autocorrect="off" spellcheck="false">
+  <button id="gateGo">Open the dashboard</button>
+  <p id="gateNo"></p>
+</div></div>
+
+<script>
+(function(){
+  var c=window.console=window.console||{};
+  var n=['log','warn','error','info','debug','assert','trace','dir','table','group','groupEnd','time','timeEnd'];
+  for(var i=0;i<n.length;i++) if(typeof c[n[i]]!=='function') c[n[i]]=function(){};
+})();
+</script>
+<script>
+const $=s=>document.querySelector(s);
+const CFG_KEY='shator-config', DB_NAME='shator-canvas', STORE='walls';
+let db=null, ART=[], selId=null, storageOK=true;
+
+/* ---------------- the door ----------------
+   A lock on the dashboard, not on the database. It keeps passers-by out
+   of the controls; it is not a secret, since anyone can read this file. */
+const GATE_PASS='art@26', GATE_KEY='shator-open';
+function openGate(){
+  $('#gate').classList.add('off');
+  try{ sessionStorage.setItem(GATE_KEY,'1'); }catch(e){}
+  boot();
+}
+$('#gateGo').onclick=()=>{
+  if($('#gatePass').value===GATE_PASS){ openGate(); }
+  else{ $('#gateNo').textContent='That is not the password.'; $('#gatePass').select(); }
+};
+$('#gatePass').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#gateGo').click(); });
+
+/* ---------------- the cloud library ----------------
+   Baked in so the dashboard works from any device with no setup. */
+const CLOUD={
+  url :'https://voigdkmocljncuffpuzj.supabase.co',
+  anon:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZvaWdka21vY2xqbmN1ZmZwdXpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NjI5NjgsImV4cCI6MjEwNTEzODk2OH0.s65lyNPA84NguafjqUl-ihp700BuFitqLn729DRq-Gs'
+};
+
+/* ---------------- storage ---------------- */
+function openDB(){
+  return new Promise(res=>{
+    let rq; try{ rq=indexedDB.open(DB_NAME,1); }catch(e){ storageOK=false; return res(null); }
+    const done=v=>{ if(!done.f){ done.f=true; res(v); } };
+    setTimeout(()=>{ storageOK=false; done(null); },2500);
+    rq.onupgradeneeded=()=>{ try{ rq.result.createObjectStore(STORE,{keyPath:'id'}); }catch(e){} };
+    rq.onsuccess=()=>done(rq.result);
+    rq.onerror=rq.onblocked=()=>{ storageOK=false; done(null); };
+  });
+}
+const st=m=>db.transaction(STORE,m).objectStore(STORE);
+const dbPut=r=>new Promise(res=>{ if(!db) return res(); const q=st('readwrite').put(r); q.onsuccess=q.onerror=()=>res(); });
+const dbDel=id=>new Promise(res=>{ if(!db) return res(); const q=st('readwrite').delete(id); q.onsuccess=q.onerror=()=>res(); });
+const dbClear=()=>new Promise(res=>{ if(!db) return res(); const q=st('readwrite').clear(); q.onsuccess=q.onerror=()=>res(); });
+const dbAll=()=>new Promise(res=>{ if(!db) return res([]); const q=st('readonly').getAll(); q.onsuccess=()=>res(q.result||[]); q.onerror=()=>res([]); });
+
+function toast(m,ms){ const t=$('#toast'); t.textContent=m; t.classList.add('on');
+  clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('on'),ms||2600); }
+function progress(p){ $('#bar').style.width=(p*100)+'%'; if(p>=1) setTimeout(()=>$('#bar').style.width='0',400); }
+
+/* ---------------- image handling ---------------- */
+function loadBitmap(file){
+  if(window.createImageBitmap) return createImageBitmap(file).catch(()=>viaImg(file));
+  return viaImg(file);
+}
+function viaImg(file){
+  return new Promise((res,rej)=>{
+    const u=URL.createObjectURL(file), im=new Image();
+    im.onload=()=>res(im); im.onerror=()=>{ URL.revokeObjectURL(u); rej(new Error('unreadable')); };
+    im.src=u;
+  });
+}
+function scaleTo(bmp,maxEdge,q){
+  const w0=bmp.width||bmp.naturalWidth, h0=bmp.height||bmp.naturalHeight;
+  const k=Math.min(1,maxEdge/Math.max(w0,h0));
+  const c=document.createElement('canvas');
+  c.width=Math.max(1,Math.round(w0*k)); c.height=Math.max(1,Math.round(h0*k));
+  const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height);
+  g.drawImage(bmp,0,0,c.width,c.height);
+  return new Promise(r=>c.toBlob(b=>r(b),'image/jpeg',q));
+}
+async function processFile(file){
+  const bmp=await loadBitmap(file);
+  const w=bmp.width||bmp.naturalWidth, h=bmp.height||bmp.naturalHeight;
+  const out=await Promise.all([scaleTo(bmp,1600,.86), scaleTo(bmp,440,.72)]);
+  if(bmp.close) bmp.close();
+  return { full:out[0], thumb:out[1], aspect:w/h,
+           orientation: (w/h)>1.02 ? 'landscape' : 'portrait' };
+}
+
+/* ---------------- model ---------------- */
+const CATS=['junior','senior','campus'];
+const CAT={
+  junior:{ name:'Class 1-5', colour:'#1668a6' },
+  senior:{ name:'Class 6-12',colour:'#d01e58' },
+  campus:{ name:'Campus',    colour:'#1e7a38' }
+};
+const WINNER_LIMIT=3;
+const normCat=c=>(c==='senior'||c==='campus')?c:'junior';
+const inCat=c=>ART.filter(a=>normCat(a.category)===c);
+const winnersIn=c=>inCat(c).filter(a=>a.winner);
+const nextId=()=>ART.reduce((m,a)=>Math.max(m,a.id),0)+1;
+function urlsFor(a){
+  if(a._fullUrl) return;
+  a._fullUrl  = a.full  ? URL.createObjectURL(a.full)  : (a.url||null);
+  a._thumbUrl = a.thumb ? URL.createObjectURL(a.thumb) : (a.url||null);
+}
+function reorder(){ ART.forEach((a,i)=>a.sort_order=i+1); }
+async function persistAll(){ reorder(); for(const a of ART) await dbPut(strip(a)); }
+function strip(a){
+  const o={};
+  ['id','sort_order','filename','title','artist','year','medium','orientation','category','winner','full','thumb','url','turl'].forEach(k=>{
+    if(a[k]!==undefined) o[k]=a[k];
+  });
+  return o;
+}
+
+async function addFiles(files){
+  const imgs=[...files].filter(f=>f.type.indexOf('image/')===0);
+  if(!imgs.length){ toast('Those files are not pictures'); return; }
+  let added=0, failed=0;
+  for(let i=0;i<imgs.length;i++){
+    progress((i+1)/imgs.length);
+    try{
+      const p=await processFile(imgs[i]);
+      const a={ id:nextId(), sort_order:ART.length+1,
+        filename:imgs[i].name,
+        title:imgs[i].name.replace(/\.[^.]+$/,''),   // kept verbatim — do not tidy it
+        artist:'', year:'', medium:'', orientation:p.orientation,
+        category:normCat($('#newCat').value), winner:false,
+        full:p.full, thumb:p.thumb };
+      ART.push(a); urlsFor(a); await dbPut(strip(a)); added++;
+      render();
+      if(sbOn()){
+        try{ await sbPush(a); }
+        catch(err){ failed++; }
+      }
+    }catch(e){}
+  }
+  reorder(); render(); progress(1);
+  if(failed) toast(added+' added here · '+failed+" couldn't reach the cloud",6000);
+  else toast(added+(added===1?' picture added and live':' pictures added and live'));
+}
+
+/* ---------------- rendering ---------------- */
+function render(){
+  const v=ART.filter(a=>a.orientation==='portrait').length;
+  $('#tally').textContent = ART.length
+    ? ART.length+' works · '+v+' vertical · '+(ART.length-v)+' horizontal'
+    : 'No artwork yet';
+  $('#empty').style.display = ART.length?'none':'block';
+  const list=$('#list'); list.innerHTML='';
+
+  CATS.forEach(cat=>{
+    const mine=inCat(cat);
+    const head=document.createElement('div');
+    head.className='cathead';
+    head.style.setProperty('--c',CAT[cat].colour);
+    head.innerHTML='<h3>'+CAT[cat].name+'</h3>'+
+      '<span>'+mine.length+(mine.length===1?' work':' works')+
+      ' · '+winnersIn(cat).length+' of '+WINNER_LIMIT+' on the winners wall</span>';
+    list.appendChild(head);
+
+    if(!mine.length){
+      const none=document.createElement('p');
+      none.className='catempty';
+      none.textContent='Nothing in this section yet.';
+      list.appendChild(none);
+      return;
+    }
+    mine.forEach((a,i)=>{
+      const row=document.createElement('div');
+      row.className='row'+(a.id===selId?' sel':'')+(a.winner?' win':'');
+      row.style.setProperty('--c',CAT[cat].colour);
+      row.innerHTML=
+        '<div class="ord">'+(i+1)+'</div>'+
+        '<div class="thumb">'+(a._thumbUrl?'<img src="'+a._thumbUrl+'" alt="">':'')+'</div>'+
+        '<div class="meta"><b></b><span></span></div>'+
+        '<div class="seg">'+
+          '<button data-o="portrait" class="'+(a.orientation==='portrait'?'on':'')+'"><i class="v"></i>Vertical</button>'+
+          '<button data-o="landscape" class="'+(a.orientation==='landscape'?'on':'')+'"><i class="h"></i>Horizontal</button>'+
+        '</div>'+
+        '<div class="acts">'+
+          '<button data-a="win" class="star'+(a.winner?' on':'')+'" title="Show on the winners wall">★</button>'+
+          '<button data-a="up" title="Move earlier">↑</button>'+
+          '<button data-a="down" title="Move later">↓</button>'+
+          '<button data-a="edit" title="Edit details">✎</button>'+
+          '<button data-a="del" class="del" title="Delete">✕</button>'+
+        '</div>';
+      row.querySelector('.meta b').textContent=a.title||('No. '+(i+1));
+      const det=[a.artist,a.year,a.medium].filter(Boolean).join(' · ');
+      row.querySelector('.meta span').textContent=
+        (a.filename||'no file name')+(det?'  —  '+det:'');
+      row.querySelectorAll('.seg button').forEach(b=>{
+        b.onclick=async()=>{ a.orientation=b.dataset.o; await dbPut(strip(a));
+          if(sbOn()){ try{ await sbPush(a); }catch(e){ toast('Saved here, cloud upload failed',4000); } }
+          render(); };
+      });
+      row.querySelectorAll('.acts button').forEach(b=>{
+        b.onclick=()=>act(b.dataset.a,a,i,cat);
+      });
+      list.appendChild(row);
+    });
+  });
+  renderEditorCats();
+}
+function renderEditorCats(){
+  const sel=$('#eCat'); if(sel.options.length) return;
+  CATS.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=CAT[c].name; sel.appendChild(o); });
+}
+async function act(kind,a,i,cat){
+  if(kind==='win'){
+    if(!a.winner && winnersIn(cat).length>=WINNER_LIMIT){
+      toast('Only '+WINNER_LIMIT+' winners per section — take one off first',4000); return;
+    }
+    a.winner=!a.winner; await dbPut(strip(a));
+    if(sbOn()){ try{ await sbPush(a); }catch(e){ toast('Saved here, cloud upload failed',4000); } }
+    render(); toast(a.winner?'Added to the winners wall':'Taken off the winners wall'); return;
+  }
+  // reordering happens within the section, which is the order visitors walk
+  const mine=inCat(cat), j=mine.indexOf(a);
+  if((kind==='up'&&j>0)||(kind==='down'&&j<mine.length-1)){
+    const other=mine[kind==='up'?j-1:j+1];
+    const ia=ART.indexOf(a), ib=ART.indexOf(other);
+    ART[ia]=other; ART[ib]=a;
+    await persistAll(); render();
+    if(sbOn()){ try{ await sbPush(a); await sbPush(other); }catch(e){} }
+    return;
+  }
+  if(kind==='edit') openEditor(a);
+  if(kind==='del'){
+    if(!confirm('Delete "'+(a.title||'this picture')+'"?')) return;
+    ART=ART.filter(x=>x.id!==a.id);
+    await dbDel(a.id);
+    if(sbOn()){ await sbDeleteRow(a.id); await sbDeleteFiles([a.id]); }
+    releaseUrls(a);
+    await persistAll(); if(selId===a.id) closeEditor();
+    render(); toast('Deleted');
+  }
+}
+
+/* ---------------- editor ---------------- */
+function openEditor(a){
+  selId=a.id;
+  $('#eTitle').textContent=a.title||'Artwork';
+  $('#ePrev').innerHTML=a._fullUrl?'<img src="'+a._fullUrl+'" alt="">':'No picture';
+  $('#eFile').value=a.filename||'';
+  $('#eName').value=a.title||''; $('#eArtist').value=a.artist||'';
+  $('#eYear').value=a.year||'';  $('#eMedium').value=a.medium||'';
+  $('#eOrient').value=a.orientation||'portrait';
+  renderEditorCats();
+  $('#eCat').value=normCat(a.category);
+  $('#editor').classList.add('on'); render();
+}
+function closeEditor(){ selId=null; $('#editor').classList.remove('on'); render(); }
+const cur=()=>ART.find(a=>a.id===selId);
+$('#eClose').onclick=closeEditor;
+$('#eSave').onclick=async()=>{
+  const a=cur(); if(!a) return;
+  a.filename=$('#eFile').value.trim();
+  a.title=$('#eName').value.trim(); a.artist=$('#eArtist').value.trim();
+  a.year=$('#eYear').value.trim();  a.medium=$('#eMedium').value.trim();
+  a.orientation=$('#eOrient').value;
+  const newCat=$('#eCat').value;
+  if(newCat!==normCat(a.category)){
+    // a winner moving section must not overfill its new one
+    if(a.winner && winnersIn(newCat).length>=WINNER_LIMIT){
+      a.winner=false;
+      toast(CAT[newCat].name+' already has '+WINNER_LIMIT+' winners — moved in without the star',5000);
+    }
+    a.category=newCat;
+  }
+  await dbPut(strip(a));
+  if(sbOn()){ try{ await sbPush(a); toast('Saved and live'); }catch(e){ toast('Saved here, upload failed: '+e.message,6000); } }
+  else toast('Saved');
+  render();
+};
+$('#eDelete').onclick=()=>{ const a=cur(); if(a) act('del',a,ART.indexOf(a)); };
+$('#eReplace').onclick=()=>{ $('#fileOne').click(); };
+$('#fileOne').onchange=async e=>{
+  const f=e.target.files&&e.target.files[0]; e.target.value=''; const a=cur();
+  if(!f||!a) return;
+  progress(.4);
+  try{
+    const p=await processFile(f);
+    if(a._fullUrl&&a.full){ URL.revokeObjectURL(a._fullUrl); URL.revokeObjectURL(a._thumbUrl); }
+    a.full=p.full; a.thumb=p.thumb; a._fullUrl=null; a._thumbUrl=null;
+    a.filename=f.name; a.orientation=p.orientation; urlsFor(a);
+    await dbPut(strip(a));
+    if(sbOn()) await sbPush(a);
+    openEditor(a); toast('Picture replaced');
+  }catch(err){ toast("Couldn't read that image"); }
+  progress(1);
+};
+
+/* ---------------- upload wiring ---------------- */
+const drop=$('#drop');
+['dragenter','dragover'].forEach(v=>drop.addEventListener(v,e=>{e.preventDefault();drop.classList.add('hot');}));
+['dragleave','drop'].forEach(v=>drop.addEventListener(v,e=>{e.preventDefault();drop.classList.remove('hot');}));
+drop.addEventListener('drop',e=>addFiles(e.dataTransfer.files));
+$('#pick').onclick=()=>$('#fileMulti').click();
+drop.addEventListener('click',e=>{ if(e.target.id!=='pick') $('#fileMulti').click(); });
+$('#fileMulti').onchange=e=>{ const f=e.target.files; if(f.length) addFiles(f); e.target.value=''; };
+
+/* ---------------- export / import / clear ---------------- */
+const toDataURL=b=>new Promise(r=>{ const fr=new FileReader(); fr.onload=()=>r(fr.result); fr.readAsDataURL(b); });
+function fromDataURL(u){
+  const p=u.split(','), mime=p[0].match(/:(.*?);/)[1], bin=atob(p[1]);
+  const arr=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+  return new Blob([arr],{type:mime});
+}
+$('#exportBtn').onclick=async()=>{
+  if(!ART.length){ toast('Nothing to export'); return; }
+  const walls=[];
+  for(let i=0;i<ART.length;i++){
+    progress((i+1)/ART.length);
+    const a=ART[i];
+    const w={ id:a.id, sort_order:i+1, filename:a.filename||'', title:a.title||'',
+              artist:a.artist||'', year:a.year||'', medium:a.medium||'', orientation:a.orientation,
+              category:normCat(a.category), winner:!!a.winner };
+    if(a.full)  w.image=await toDataURL(a.full);
+    if(a.thumb) w.thumb=await toDataURL(a.thumb);
+    if(a.url)   w.url=a.url;
+    walls.push(w);
+  }
+  const b=new Blob([JSON.stringify({version:2,gallery:'Shator Canvas',walls},null,1)],{type:'application/json'});
+  const el=document.createElement('a');
+  el.href=URL.createObjectURL(b); el.download='collection.json'; el.click();
+  setTimeout(()=>URL.revokeObjectURL(el.href),4000);
+  progress(1); toast('collection.json downloaded');
+};
+$('#importBtn').onclick=()=>$('#fileJson').click();
+$('#fileJson').onchange=e=>{
+  const f=e.target.files&&e.target.files[0]; e.target.value=''; if(!f) return;
+  const fr=new FileReader();
+  fr.onload=async()=>{
+    try{
+      const j=JSON.parse(fr.result), walls=j.walls||[];
+      for(let i=0;i<walls.length;i++){
+        progress((i+1)/walls.length);
+        const w=walls[i];
+        const a={ id:nextId(), sort_order:ART.length+1, filename:w.filename||'',
+                  title:w.title||'', artist:w.artist||'',
+                  category:normCat(w.category), winner:!!w.winner,
+                  year:w.year||'', medium:w.medium||'',
+                  orientation:(w.orientation==='landscape'?'landscape':'portrait'), url:w.url||null };
+        if(w.image) a.full=fromDataURL(w.image);
+        if(w.thumb) a.thumb=fromDataURL(w.thumb);
+        else if(w.image) a.thumb=a.full;
+        ART.push(a); urlsFor(a); await dbPut(strip(a));
+      }
+      reorder(); render(); progress(1); toast(walls.length+' imported');
+    }catch(err){ toast("That file isn't a collection export"); }
+  };
+  fr.readAsText(f);
+};
+$('#clearBtn').onclick=async()=>{
+  if(!ART.length){ toast('Already empty'); return; }
+  const cloud=sbOn();
+  const where = cloud
+    ? 'This removes them from this browser and from the cloud library, including the uploaded image files. Visitors lose them straight away.'
+    : 'This removes them from this browser only.';
+  const what = ART.length===1 ? 'Delete this picture?' : 'Delete all '+ART.length+' pictures?';
+  if(!confirm(what+'\n\n'+where+'\n\nThis cannot be undone.')) return;
+  const ids=ART.map(a=>a.id);
+  progress(.15);
+  if(cloud){
+    for(let i=0;i<ids.length;i++){ await sbDeleteRow(ids[i]); progress(.15+.5*(i+1)/ids.length); }
+    await sbDeleteFiles(ids);
+  }
+  progress(.8);
+  await dbClear();
+  ART.forEach(releaseUrls);
+  ART=[]; selId=null; closeEditor(); render(); progress(1);
+  toast(cloud?'Deleted here and in the cloud':'Deleted from this browser');
+};
+$('#forgetBtn').onclick=async()=>{
+  if(!confirm('Go back to the built-in cloud project?\n\nYour artwork in the cloud is not touched.')) return;
+  try{ localStorage.removeItem(CFG_KEY); }catch(e){}
+  SB.url=CLOUD.url; SB.anon=CLOUD.anon;
+  $('#sbUrl').value=SB.url; $('#sbKey').value=SB.anon;
+  await sbProbe(); toast('Back to the built-in project');
+};
+
+/* =====================================================================
+   SUPABASE
+   ===================================================================== */
+const SB={url:'',anon:''};
+let sbLive=false;
+const sbOn=()=>!!(SB.url&&SB.anon);
+const base=()=>SB.url.replace(/\/+$/,'');
+const BUCKET='gallery';
+const hdr=x=>Object.assign({apikey:SB.anon,Authorization:'Bearer '+SB.anon},x||{});
+function saveCfg(){ try{ localStorage.setItem(CFG_KEY,JSON.stringify({url:SB.url,anon:SB.anon})); }catch(e){} }
+function loadCfg(){
+  SB.url=CLOUD.url; SB.anon=CLOUD.anon;
+  try{ const c=JSON.parse(localStorage.getItem(CFG_KEY)||'null');
+       if(c&&c.url&&c.anon){ SB.url=c.url; SB.anon=c.anon; } }catch(e){}
+  $('#sbUrl').value=SB.url; $('#sbKey').value=SB.anon;
+  sbStatus();
+}
+function sbStatus(msg){
+  $('#sbDot').className='dot'+(sbLive?' live':'');
+  $('#sbSub').textContent = msg || (!sbOn()
+    ? 'No project set. Artwork lives only in this browser.'
+    : (sbLive ? 'Connected. Every change you make here goes live for visitors straight away.'
+              : 'Cannot reach the cloud library. Changes are being kept in this browser.'));
+}
+/* One read to see whether the library is reachable. */
+async function sbProbe(){
+  if(!sbOn()){ sbLive=false; sbStatus(); return false; }
+  try{
+    const r=await fetch(base()+'/rest/v1/artworks?select=id&limit=1',{headers:hdr()});
+    sbLive=r.ok;
+    sbStatus(r.ok?null:'Cannot read the artworks table ('+r.status+'). Run the setup SQL below, then reload.');
+  }catch(e){ sbLive=false; sbStatus('No connection to the cloud library.'); }
+  return sbLive;
+}
+async function upBlob(name,blob){
+  const r=await fetch(base()+'/storage/v1/object/'+BUCKET+'/'+name,{
+    method:'POST', headers:hdr({'Content-Type':blob.type||'image/jpeg','x-upsert':'true'}), body:blob});
+  if(!r.ok) throw new Error(r.status===401||r.status===403
+    ? 'the gallery bucket is refusing uploads — run the setup SQL again'
+    : 'picture upload failed ('+r.status+')');
+  return base()+'/storage/v1/object/public/'+BUCKET+'/'+name;
+}
+async function sbPush(a){
+  if(!sbOn()) return;
+  const v=Date.now();
+  const row={ id:a.id, sort_order:a.sort_order||ART.indexOf(a)+1, filename:a.filename||'',
+              title:a.title||'', artist:a.artist||'',
+              year:a.year||'', medium:a.medium||'', orientation:a.orientation,
+              category:normCat(a.category), winner:!!a.winner };
+  if(a.full)  row.image_url=await upBlob('art-'+a.id+'-full.jpg',a.full)+'?v='+v;
+  else if(a.url) row.image_url=a.url;
+  if(a.thumb) row.thumb_url=await upBlob('art-'+a.id+'-thumb.jpg',a.thumb)+'?v='+v;
+  else row.thumb_url=a.turl||row.image_url;
+  const r=await fetch(base()+'/rest/v1/artworks',{
+    method:'POST', headers:hdr({'Content-Type':'application/json',
+      Prefer:'resolution=merge-duplicates,return=minimal'}), body:JSON.stringify([row])});
+  if(!r.ok){
+    const t=await r.text().catch(()=>'');
+    throw new Error(r.status===401||r.status===403
+      ? 'the database is refusing writes — run the setup SQL again'
+      : 'saving failed ('+r.status+') '+t.slice(0,120));
+  }
+  if(!sbLive){ sbLive=true; sbStatus(); }
+}
+async function sbDeleteRow(id){
+  try{ await fetch(base()+'/rest/v1/artworks?id=eq.'+id,{method:'DELETE',headers:hdr()}); }catch(e){}
+}
+async function sbDeleteFiles(ids){
+  if(!sbOn()||!ids.length) return;
+  const prefixes=[];
+  ids.forEach(id=>prefixes.push('art-'+id+'-full.jpg','art-'+id+'-thumb.jpg'));
+  try{
+    await fetch(base()+'/storage/v1/object/'+BUCKET,{
+      method:'DELETE', headers:hdr({'Content-Type':'application/json'}),
+      body:JSON.stringify({prefixes})});
+  }catch(e){}
+}
+function releaseUrls(a){
+  if(a.full&&a._fullUrl) URL.revokeObjectURL(a._fullUrl);
+  if(a.thumb&&a._thumbUrl) URL.revokeObjectURL(a._thumbUrl);
+  a._fullUrl=a._thumbUrl=null;
+}
+$('#advBtn').onclick=()=>{
+  const a=$('#adv'); const on=a.style.display==='none';
+  a.style.display=on?'block':'none';
+  $('#advBtn').textContent=on?'Hide project settings':'Change project';
+};
+$('#sbConnect').onclick=async()=>{
+  SB.url=$('#sbUrl').value.trim(); SB.anon=$('#sbKey').value.trim();
+  if(!SB.url||!SB.anon){ toast('Project URL and anon key are both needed'); return; }
+  saveCfg(); await sbProbe();
+  toast(sbLive?'Connected':'Saved, but the library did not answer',5000);
+};
+$('#sbPush').onclick=async()=>{
+  if(!sbOn()){ toast('No cloud project set'); return; }
+  if(!ART.length){ toast('Nothing to upload'); return; }
+  reorder();
+  for(let i=0;i<ART.length;i++){
+    progress((i+1)/ART.length);
+    toast('Uploading '+(i+1)+' of '+ART.length+'…',60000);
+    try{ await sbPush(ART[i]); }
+    catch(err){ toast('Stopped at "'+(ART[i].title||ART[i].id)+'": '+err.message,8000); progress(1); return; }
+  }
+  progress(1); toast(ART.length+' works are live'); sbProbe();
+};
+$('#sbPull').onclick=async()=>{
+  if(!sbOn()){ toast('Add your project URL and key first'); return; }
+  try{
+    const r=await fetch(base()+'/rest/v1/artworks?select=*&order=sort_order',{headers:hdr()});
+    if(!r.ok) throw new Error('Could not read the table ('+r.status+')');
+    const rows=await r.json();
+    ART=rows.map(w=>({ id:w.id, sort_order:w.sort_order, filename:w.filename||'', title:w.title||'', artist:w.artist||'',
+      category:normCat(w.category), winner:!!w.winner,
+      year:w.year||'', medium:w.medium||'',
+      orientation:(w.orientation==='landscape'?'landscape':'portrait'),
+      url:w.image_url||null, turl:w.thumb_url||null,
+      _fullUrl:w.image_url||null, _thumbUrl:w.thumb_url||w.image_url||null }));
+    for(const a of ART) await dbPut(strip(a));
+    sbLive=true; sbStatus();
+    render(); toast(ART.length+' loaded from the cloud');
+  }catch(err){ toast(err.message,6000); }
+};
+const SQL=[
+'-- Shator Canvas — run this once in the Supabase SQL editor.',
+'-- Safe to run again at any time.','',
+'create table if not exists artworks (',
+'  id int primary key,',
+'  sort_order int default 0,',
+"  filename text default '',",
+"  category text default 'junior',",
+'  winner boolean default false,',
+"  title text default '', artist text default '',",
+"  year text default '', medium text default '',",
+"  orientation text default 'portrait',",
+'  image_url text, thumb_url text,',
+'  updated_at timestamptz default now()',
+');','',
+'-- columns added by later versions',
+"alter table artworks add column if not exists filename text default '';",
+'alter table artworks add column if not exists sort_order int default 0;',
+"alter table artworks add column if not exists orientation text default 'portrait';",
+"alter table artworks add column if not exists category text default 'junior';",
+'alter table artworks add column if not exists winner boolean default false;',
+'alter table artworks add column if not exists image_url text;',
+'alter table artworks add column if not exists thumb_url text;','',
+'alter table artworks enable row level security;',
+'drop policy if exists "anyone can view" on artworks;',
+'drop policy if exists "curator can edit" on artworks;',
+'drop policy if exists "gallery read" on artworks;',
+'drop policy if exists "gallery write" on artworks;',
+'create policy "gallery read"  on artworks for select using (true);',
+'create policy "gallery write" on artworks for all using (true) with check (true);','',
+'insert into storage.buckets (id, name, public)',
+"values ('gallery', 'gallery', true)",
+'on conflict (id) do nothing;',
+'drop policy if exists "anyone can view files" on storage.objects;',
+'drop policy if exists "curator can upload" on storage.objects;',
+'drop policy if exists "gallery files read" on storage.objects;',
+'drop policy if exists "gallery files write" on storage.objects;',
+'create policy "gallery files read"  on storage.objects',
+"  for select using (bucket_id = 'gallery');",
+'create policy "gallery files write" on storage.objects',
+"  for all using (bucket_id = 'gallery') with check (bucket_id = 'gallery');",'',
+'-- No Supabase user account is needed. The dashboard writes with the',
+'-- public key, so keep the dashboard address to yourself.'
+].join('\n');
+$('#sqlBtn').onclick=()=>{
+  const b=$('#sql'); b.textContent=SQL; b.classList.toggle('on');
+  $('#sqlBtn').textContent=b.classList.contains('on')?'Hide setup SQL':'Show one-time setup SQL';
+};
+
+/* ---------------- boot ---------------- */
+async function boot(){
+  if(boot.done) return; boot.done=true;
+  loadCfg();
+  db=await openDB();
+  const recs=(await dbAll()).filter(r=>typeof r.id==='number');
+  recs.sort((a,b)=>(a.sort_order||a.id)-(b.sort_order||b.id));
+  ART=recs;
+  ART.forEach(urlsFor);
+  reorder();
+  render();
+  await sbProbe();
+  /* On a fresh device, take the show from the cloud rather than starting
+     an empty second collection that would later overwrite it. */
+  const hasOriginals=ART.some(a=>a.full||a.thumb);
+  if(sbLive && !hasOriginals) $('#sbPull').click();
+  if(!storageOK) toast('This browser is blocking local storage — work from one device, or export often',7000);
+}
+let opened=false;
+try{ opened=sessionStorage.getItem(GATE_KEY)==='1'; }catch(e){}
+if(opened) openGate(); else setTimeout(()=>$('#gatePass').focus(),120);
+</script>
+</body>
+</html>
