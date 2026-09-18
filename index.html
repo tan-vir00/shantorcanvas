@@ -748,6 +748,8 @@ function walkable(x,z){
    FRAMES
    ===================================================================== */
 const clip=(t,n)=>t.length>n?t.slice(0,n-1)+'…':t;
+/* drop a trailing .jpg and the like, wherever the name came from */
+const bare=t=>String(t||'').replace(/\.(jpe?g|png|webp|heic|heif|gif|bmp|tiff?)$/i,'');
 /* Each plaque gets its OWN canvas. Sharing one canvas between textures
    made every label upload to the card whatever had been drawn last, so
    pictures ended up wearing each other's names. */
@@ -757,15 +759,15 @@ function makePlaque(slot){
   const g=cv.getContext('2d');
   g.fillStyle='#efe9dc'; g.fillRect(0,0,560,182);
   g.textAlign='center';
-  g.fillStyle='#1c1814'; g.font='600 37px Georgia,serif';
-  g.fillText(clip(a.title||('No. '+(slot.index+1)),28),280,54);
+  /* One name only. The file name was being printed a second time, in full
+     with its extension, under a title that was already the same name. */
+  const name=bare(a.title||a.filename||('No. '+(slot.index+1)));
   const det=[a.artist,a.year,a.medium].filter(Boolean).join(', ');
-  g.fillStyle='#6d6558'; g.font='23px system-ui,sans-serif';
-  g.fillText(clip(det||'Shator Canvas',44),280,98);
-  // the uploaded file name, which carries the participant's details
-  if(a.filename){
-    g.fillStyle='#8d8578'; g.font='21px ui-monospace,Menlo,monospace';
-    g.fillText(clip(a.filename,46),280,142);
+  g.fillStyle='#1c1814'; g.font='600 40px Georgia,serif';
+  g.fillText(clip(name,27),280,det?84:112);
+  if(det){
+    g.fillStyle='#6d6558'; g.font='24px system-ui,sans-serif';
+    g.fillText(clip(det,44),280,134);
   }
   const tex=new THREE.CanvasTexture(cv);
   tex.encoding=THREE.sRGBEncoding;
@@ -997,9 +999,9 @@ function updateCaption(){
   const el=$('#caption');
   if(best){
     const a=best.artwork;
-    el.querySelector('h3').textContent=a.title||('No. '+(best.index+1));
+    el.querySelector('h3').textContent=bare(a.title||a.filename||('No. '+(best.index+1)));
     const det=[a.artist,a.year,a.medium].filter(Boolean).join(' · ');
-    el.querySelector('p').textContent=[det,a.filename].filter(Boolean).join('  —  ')||'Shator Canvas';
+    el.querySelector('p').textContent=det||'Shator Canvas';
     el.classList.add('on');
   } else el.classList.remove('on');
 }
