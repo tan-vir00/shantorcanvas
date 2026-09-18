@@ -53,10 +53,12 @@ button{font-family:inherit;cursor:pointer}
 .step em{font-style:normal;font-size:12.5px;line-height:1.65;color:#aaa091;letter-spacing:.02em}
 .step kbd{margin:0 1px}
 
-#visitors{margin:28px 0 0;font-size:10.5px;letter-spacing:.16em;color:#6b6356;
-  opacity:0;transition:opacity 1s ease .3s}
+#visitors{margin:30px 0 0;font-size:10.5px;letter-spacing:.2em;color:#8d8374;
+  text-transform:uppercase;opacity:0;transition:opacity 1s ease .3s}
 #visitors.on{opacity:1}
-#visitors b{color:#9b8f76;font-weight:600;letter-spacing:.1em}
+#visitors b{display:block;font-family:var(--serif);font-size:34px;font-weight:600;
+  letter-spacing:.02em;color:var(--brass);line-height:1.1;margin-bottom:4px;
+  text-transform:none;text-shadow:0 2px 20px rgba(216,184,120,.3)}
 #emptyNote{display:none;font-size:12.5px;color:#c9b489;line-height:1.7;margin:18px auto 0;max-width:330px}
 #emptyNote a{color:var(--brass)}
 kbd{background:#241e18;border:1px solid #453a2c;border-radius:3px;padding:1px 6px;font-size:11px;color:#cdbfa8}
@@ -68,15 +70,19 @@ kbd{background:#241e18;border:1px solid #453a2c;border-radius:3px;padding:1px 6p
 #crosshair{position:fixed;top:50%;left:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;
   background:rgba(255,255,255,.55);z-index:15;pointer-events:none}
 
-#caption{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 74px);
+#caption{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 86px);
   transform:translateX(-50%) translateY(8px);z-index:20;max-width:min(520px,88vw);text-align:center;
   color:var(--text);pointer-events:none;background:rgba(10,8,6,.62);
   backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-  border:1px solid var(--brass-dim);padding:12px 22px;border-radius:3px;opacity:0;
+  border:1px solid var(--brass-dim);padding:11px 20px;border-radius:3px;opacity:0;
   transition:opacity .3s,transform .3s}
 #caption.on{opacity:1;transform:translateX(-50%) translateY(0)}
 #caption h3{font-family:var(--serif);font-size:20px;font-weight:600;margin:0 0 3px}
 #caption p{margin:0;font-size:12px;color:var(--muted);letter-spacing:.05em}
+/* nothing to add beneath the name: shrink the box rather than pad it out */
+#caption.solo{padding:9px 20px}
+#caption.solo h3{margin:0}
+#caption.solo p{display:none}
 
 #miniWrap{position:fixed;top:calc(env(safe-area-inset-top,0px) + 12px);right:12px;z-index:25;
   background:rgba(10,8,6,.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
@@ -107,24 +113,30 @@ kbd{background:#241e18;border:1px solid #453a2c;border-radius:3px;padding:1px 6p
   background:rgba(216,184,120,.45);top:54px;left:54px}
 /* Ten seconds of guidance in the corner, because the entrance screen is
    read once and then forgotten the moment the gallery opens. */
-#walkHint{position:fixed;left:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);z-index:14;
-  max-width:250px;text-align:left;pointer-events:none;
-  opacity:0;transform:translateY(8px);transition:opacity .7s ease,transform .7s ease;
-  background:rgba(10,8,6,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-  border:1px solid var(--brass-dim);border-left:2px solid var(--brass);
-  padding:12px 15px;border-radius:3px;
-  color:#cdc5b7;font-size:12px;line-height:1.75;letter-spacing:.02em}
-#walkHint.on{opacity:1;transform:none}
-#walkHint b{display:block;color:var(--brass);font-size:9.5px;letter-spacing:.18em;
-  text-transform:uppercase;font-weight:600;margin-bottom:6px}
+/* A wide band along the bottom, under the picture's name rather than
+   beside it — the old corner panel sat on top of the label on a phone. */
+#walkHint{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);z-index:14;
+  width:min(560px,94vw);text-align:center;pointer-events:none;
+  opacity:0;transform:translateX(-50%) translateY(8px);
+  transition:opacity .7s ease,transform .7s ease;
+  background:rgba(10,8,6,.66);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border:1px solid var(--brass-dim);border-top:2px solid var(--brass);
+  padding:11px 16px;border-radius:3px;
+  color:#cdc5b7;font-size:12px;line-height:1.85;letter-spacing:.02em}
+#walkHint.on{opacity:1;transform:translateX(-50%)}
+#walkHint b{color:var(--brass);font-size:9.5px;letter-spacing:.18em;
+  text-transform:uppercase;font-weight:600;margin-right:9px}
 #walkHint i{font-style:normal;color:#f0e8da;font-weight:600}
+#walkHint s{text-decoration:none;color:#5e564b;margin:0 8px}
 
 @media (max-width:640px),(pointer:coarse){
   #crosshair{display:none}
   #mini{width:96px;height:96px}
   #roomName{max-width:96px}
   #tagline{font-size:15px}
-  #walkHint{max-width:210px;font-size:11.5px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px)}
+  #walkHint{font-size:11.5px;padding:10px 13px;line-height:1.9;
+    bottom:calc(env(safe-area-inset-bottom,0px) + 12px)}
+  #walkHint b{display:block;margin:0 0 3px}
   #caption h3{font-size:17px}
 }
 @media (prefers-reduced-motion:reduce){*{transition-duration:.01ms !important}}
@@ -474,7 +486,7 @@ async function countVisit(){
     if(!r.ok) return;                       // setup SQL not run yet: stay quiet
     const n=await r.json();
     if(typeof n!=='number'||!(n>0)) return;
-    el.innerHTML='<b>'+n.toLocaleString()+'</b> &nbsp;visitors so far';
+    el.innerHTML='<b>'+n.toLocaleString()+'</b>visitors so far';
     el.classList.add('on');
     if(bump){ try{ localStorage.setItem(VISIT_KEY,String(Date.now())); }catch(e){} }
   }catch(e){}
@@ -999,8 +1011,8 @@ function startExperience(){
   blocker.style.display='none';
   const h=$('#walkHint');
   h.innerHTML='<b>How to move</b>'+(IS_TOUCH
-    ? 'Drag the <i>left</i> half to walk<br>Drag the <i>right</i> half to look<br>Tap the plan, top right, to travel'
-    : '<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to walk<br>Move the mouse to look<br><kbd>M</kbd> for the floor plan');
+    ? 'Drag the <i>left</i> half to walk <s>·</s> the <i>right</i> half to look <s>·</s> tap the plan, top right, to travel'
+    : '<kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> to walk <s>·</s> mouse to look <s>·</s> <kbd>M</kbd> for the floor plan');
   h.classList.add('on');
   setTimeout(()=>h.classList.remove('on'),10000);
 }
@@ -1112,7 +1124,8 @@ function updateCaption(){
     const a=best.artwork;
     el.querySelector('h3').textContent=bare(a.title||a.filename||('No. '+(best.index+1)));
     const det=[a.artist,a.year,a.medium].filter(Boolean).join(' · ');
-    el.querySelector('p').textContent=det||'Shator Canvas';
+    el.querySelector('p').textContent=det;
+    el.classList.toggle('solo',!det);   // no more "Shator Canvas" under every picture
     el.classList.add('on');
   } else el.classList.remove('on');
 }
