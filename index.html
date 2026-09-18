@@ -815,11 +815,21 @@ function mountFrame(p,art,index){
 
 /* ---------- distance-based texture streaming ---------- */
 const texLoader=new THREE.TextureLoader(); texLoader.crossOrigin='anonymous';
-/* The small copy is 440px wide, so swapping to it at 15m was visible as a
-   picture going soft the moment you backed away from it. */
-const D_FULL=26, D_THUMB=40, D_DROP=56, D_PLAQUE=19;
-const FULL_BUDGET=12;
+/* Two sizes exist: the 1600px original and a 440px copy. Which one a
+   picture wears is decided by how large it is ON SCREEN and whether you
+   are looking at it — not by distance alone. A picture across the room
+   that you are facing is worth the original; one two metres behind your
+   shoulder is not. Drawing costs the same either way once mipmapped, so
+   the only real limit is video memory. */
+const D_FULL=42, D_THUMB=44, D_DROP=56, D_PLAQUE=19;
+/* How many originals may be resident at once. A desktop has memory to
+   spare and a screen large enough to show the difference; a phone has
+   neither, and a phone browser that runs out of memory drops the tab. */
+const FULL_BUDGET=(IS_TOUCH||(navigator.deviceMemory&&navigator.deviceMemory<=4))?12:26;
+const HYST=3;
 const near=[];
+let lastSx=null, lastSz=null, lastRy=0, moving=false;
+const demote=[];
 function applyTex(s,level){
   const a=s.artwork;
   const src = level===2 ? (a.fullUrl||a.thumbUrl) : (a.thumbUrl||a.fullUrl);
@@ -844,17 +854,30 @@ function dropTex(s){
 let queue=[];
 function updateStreaming(){
   const cx=camera.position.x, cz=camera.position.z;
-  queue.length=0; near.length=0;
+  /* Walking or turning both count as being on the move: a picture decoded
+     mid-turn is just as much of a hitch as one decoded mid-stride. */
+  const ry=camera.rotation.y;
+  let dry=Math.abs(ry-lastRy); if(dry>Math.PI) dry=Math.PI*2-dry;
+  if(lastSx!==null) moving=Math.hypot(cx-lastSx,cz-lastSz)>0.25 || dry>0.3;
+  lastSx=cx; lastSz=cz; lastRy=ry;
+
+  const fx=-Math.sin(camera.rotation.y), fz=-Math.cos(camera.rotation.y);
+  queue.length=0; near.length=0; demote.length=0;
   for(const s of SLOTS){
-    s._d=Math.hypot(s.x-cx,s.z-cz);
-    if(s._d<D_FULL) near.push(s);
+    const dx=s.x-cx, dz=s.z-cz;
+    const d=Math.hypot(dx,dz)||0.001;
+    s._d=d;
+    if(d>D_FULL) continue;
+    /* in front of you, generously — wider than the screen so a turn of the
+       head does not catch the pictures unprepared */
+    const inView=d<7 || (dx*fx+dz*fz)/d > 0.15;
+    /* how much of the screen it takes up, roughly */
+    s._score=(inView?1000:0)+s.maxW/d;
+    near.push(s);
   }
-  /* A 1600px picture costs roughly 10MB of video memory once mipmapped, so
-     only the closest few are held at that size. Beyond that the small copy
-     is indistinguishable anyway, and a phone browser that runs out of
-     memory simply drops the tab. */
-  near.sort((a,b)=>a._d-b._d);
+  near.sort((a,b)=>b._score-a._score);
   near.forEach((s,i)=>{ s._rank=i; });
+
   for(const s of SLOTS){
     const d=s._d;
     if(d<D_PLAQUE && !s.plaque.visible){
@@ -863,17 +886,27 @@ function updateStreaming(){
       if(s.plaque.material.map){ s.plaque.material.map.dispose(); s.plaque.material.map=null; }
       s.plaque.visible=false;
     }
-    const rank=(d<D_FULL)?s._rank:1e9;
-    /* the four extra places stop a picture flickering between sizes as
-       you drift back and forth across the edge of the budget */
-    const full = rank<FULL_BUDGET || (s.level===2 && rank<FULL_BUDGET+4);
+    const rank=(d<=D_FULL)?s._rank:1e9;
+    /* the spare places stop a picture flickering between sizes as you
+       drift back and forth across the edge of the budget */
+    const full = rank<FULL_BUDGET || (s.level===2 && rank<FULL_BUDGET+HYST);
     const want = full?2 : d<D_THUMB?1 : d<D_DROP?(s.level||1) : 0;
     if(want===0){ if(s.level) dropTex(s); continue; }
-    if(want!==s.level && !s.loading) queue.push({s,level:want,d:want>s.level?d:d+1000});
+    if(want!==s.level && !s.loading){
+      (want>s.level?queue:demote).push({s,level:want,score:s._score||0});
+    }
   }
-  queue.sort((a,b)=>a.d-b.d);
-  for(let i=0;i<2&&i<queue.length;i++) applyTex(queue[i].s,queue[i].level);
+  /* Give memory back before taking more of it. */
+  for(let i=0;i<4&&i<demote.length;i++) applyTex(demote[i].s,demote[i].level);
+  /* Uploading a 1600px picture to the card costs a few milliseconds, which
+     is a visible hitch if it lands mid-stride. So: one at a time while you
+     walk, three at a time the moment you stop — which is when you are
+     actually looking at anything. */
+  queue.sort((a,b)=>b.score-a.score);
+  const n=moving?1:3;
+  for(let i=0;i<n&&i<queue.length;i++) applyTex(queue[i].s,queue[i].level);
 }
+
 
 
 /* =====================================================================
