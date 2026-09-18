@@ -169,9 +169,12 @@ pre.on{display:block}
 #gateBox{max-width:340px;width:100%}
 #gateBox h2{display:block;font-size:30px;margin:0 0 6px;color:#fff8ec}
 #gateBox p{font-size:13.5px;color:#c5bce8;margin:0 0 20px;line-height:1.6}
-#gatePass{width:100%;padding:13px 15px;border-radius:10px;border:2px solid #7c6fd4;
-  background:#1b1447;color:#fff8ec;font-size:16px;font-family:inherit;text-align:center;letter-spacing:.1em}
-#gatePass::placeholder{color:#7f74bd;letter-spacing:0}
+#gateMail,#gatePass{width:100%;padding:13px 15px;border-radius:10px;border:2px solid #7c6fd4;
+  background:#1b1447;color:#fff8ec;font-size:16px;font-family:inherit;text-align:center;letter-spacing:.06em}
+#gateMail{margin-bottom:9px;letter-spacing:0}
+#gateMail::placeholder,#gatePass::placeholder{color:#7f74bd;letter-spacing:0}
+#gateOffline{display:inline-block;margin-top:18px;font-size:11.5px;color:#9b90d8;
+  letter-spacing:.08em;text-decoration:none;border-bottom:1px solid #4d4291}
 #gateGo{margin-top:12px;width:100%;background:var(--magenta);border:2px solid var(--magenta);
   color:#fff;padding:12px;border-radius:999px;font-size:14.5px;font-weight:500}
 #gateNo{font-size:13px;color:#ff9db8;margin:12px 0 0;min-height:18px}
@@ -243,6 +246,7 @@ pre.on{display:block}
     <button class="btn" id="sbPull">Load from cloud</button>
     <button class="btn" id="sqlBtn">Show one-time setup SQL</button>
     <button class="btn" id="advBtn">Change project</button>
+    <button class="btn danger" id="signOut" style="display:none">Sign out</button>
   </div>
   <div id="adv" style="display:none;margin-top:14px">
     <label class="f"><em>Project URL</em><input class="t" id="sbUrl" placeholder="https://yourproject.supabase.co" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
@@ -291,11 +295,14 @@ pre.on{display:block}
 
 <div id="gate"><div id="gateBox">
   <h2>Shator Canvas</h2>
-  <p>Curator dashboard. Enter the password to hang, name and publish the artwork.</p>
+  <p>Curator dashboard. Sign in to hang, name and publish the artwork.</p>
+  <input id="gateMail" type="email" placeholder="Curator email" autocomplete="username"
+         autocapitalize="off" autocorrect="off" spellcheck="false">
   <input id="gatePass" type="password" placeholder="Password" autocomplete="current-password"
          autocapitalize="off" autocorrect="off" spellcheck="false">
-  <button id="gateGo">Open the dashboard</button>
+  <button id="gateGo">Sign in</button>
   <p id="gateNo"></p>
+  <a id="gateOffline" href="#">Work offline in this browser</a>
 </div></div>
 
 <script>
@@ -311,19 +318,39 @@ const CFG_KEY='shator-config', DB_NAME='shator-canvas', STORE='walls';
 let db=null, ART=[], selId=null, storageOK=true;
 
 /* ---------------- the door ----------------
-   A lock on the dashboard, not on the database. It keeps passers-by out
-   of the controls; it is not a secret, since anyone can read this file. */
-const GATE_PASS='art@26', GATE_KEY='shator-open';
-function openGate(){
-  $('#gate').classList.add('off');
-  try{ sessionStorage.setItem(GATE_KEY,'1'); }catch(e){}
-  boot();
+   A real sign-in against Supabase. The password is never written into
+   this file and never stored anywhere — it is exchanged for a token that
+   lasts an hour and dies with the tab. Without it the public key can only
+   read, so the gallery cannot be altered by anyone who finds this page. */
+const SESS_KEY='shator-session';
+function openGate(){ $('#gate').classList.add('off'); boot(); }
+function closeGate(msg){
+  $('#gate').classList.remove('off');
+  $('#gateNo').textContent=msg||'';
+  $('#gatePass').value='';
+  setTimeout(()=>$('#gatePass').focus(),120);
 }
-$('#gateGo').onclick=()=>{
-  if($('#gatePass').value===GATE_PASS){ openGate(); }
-  else{ $('#gateNo').textContent='That is not the password.'; $('#gatePass').select(); }
+$('#gateGo').onclick=async()=>{
+  const mail=$('#gateMail').value.trim(), pw=$('#gatePass').value;
+  if(!mail||!pw){ $('#gateNo').textContent='Email and password, please.'; return; }
+  $('#gateNo').textContent='Signing in…';
+  loadCfg();
+  try{
+    await sbSignIn(mail,pw);
+    $('#gatePass').value='';
+    try{ localStorage.setItem('shator-mail',mail); }catch(e){}
+    openGate();
+  }catch(err){
+    $('#gateNo').textContent=err.message;
+    $('#gatePass').select();
+  }
 };
-$('#gatePass').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#gateGo').click(); });
+$('#gateOffline').onclick=e=>{
+  e.preventDefault();
+  if(!confirm('Open the dashboard without signing in?\n\nYou can arrange and export the show, but nothing will reach the cloud.')) return;
+  openGate();
+};
+['#gateMail','#gatePass'].forEach(id=>$(id).addEventListener('keydown',e=>{ if(e.key==='Enter') $('#gateGo').click(); }));
 
 /* ---------------- the cloud library ----------------
    Baked in so the dashboard works from any device with no setup. */
@@ -426,7 +453,7 @@ async function addFiles(files){
         full:p.full, thumb:p.thumb };
       ART.push(a); urlsFor(a); await dbPut(strip(a)); added++;
       render();
-      if(sbOn()){
+      if(canWrite()){
         try{ await sbPush(a); }
         catch(err){ failed++; }
       }
@@ -488,7 +515,7 @@ function render(){
         (a.filename||'no file name')+(det?'  —  '+det:'');
       row.querySelectorAll('.seg button').forEach(b=>{
         b.onclick=async()=>{ a.orientation=b.dataset.o; await dbPut(strip(a));
-          if(sbOn()){ try{ await sbPush(a); }catch(e){ toast('Saved here, cloud upload failed',4000); } }
+          if(canWrite()){ try{ await sbPush(a); }catch(e){ toast('Saved here, cloud upload failed',4000); } }
           render(); };
       });
       row.querySelectorAll('.acts button').forEach(b=>{
@@ -509,7 +536,7 @@ async function act(kind,a,i,cat){
       toast('Only '+WINNER_LIMIT+' winners per section — take one off first',4000); return;
     }
     a.winner=!a.winner; await dbPut(strip(a));
-    if(sbOn()){ try{ await sbPush(a); }catch(e){ toast('Saved here, cloud upload failed',4000); } }
+    if(canWrite()){ try{ await sbPush(a); }catch(e){ toast('Saved here, cloud upload failed',4000); } }
     render(); toast(a.winner?'Added to the winners wall':'Taken off the winners wall'); return;
   }
   // reordering happens within the section, which is the order visitors walk
@@ -519,7 +546,7 @@ async function act(kind,a,i,cat){
     const ia=ART.indexOf(a), ib=ART.indexOf(other);
     ART[ia]=other; ART[ib]=a;
     await persistAll(); render();
-    if(sbOn()){ try{ await sbPush(a); await sbPush(other); }catch(e){} }
+    if(canWrite()){ try{ await sbPush(a); await sbPush(other); }catch(e){} }
     return;
   }
   if(kind==='edit') openEditor(a);
@@ -527,7 +554,7 @@ async function act(kind,a,i,cat){
     if(!confirm('Delete "'+(a.title||'this picture')+'"?')) return;
     ART=ART.filter(x=>x.id!==a.id);
     await dbDel(a.id);
-    if(sbOn()){ await sbDeleteRow(a.id); await sbDeleteFiles([a.id]); }
+    if(canWrite()){ await sbDeleteRow(a.id); await sbDeleteFiles([a.id]); }
     releaseUrls(a);
     await persistAll(); if(selId===a.id) closeEditor();
     render(); toast('Deleted');
@@ -566,7 +593,7 @@ $('#eSave').onclick=async()=>{
     a.category=newCat;
   }
   await dbPut(strip(a));
-  if(sbOn()){ try{ await sbPush(a); toast('Saved and live'); }catch(e){ toast('Saved here, upload failed: '+e.message,6000); } }
+  if(canWrite()){ try{ await sbPush(a); toast('Saved and live'); }catch(e){ toast('Saved here, upload failed: '+e.message,6000); } }
   else toast('Saved');
   render();
 };
@@ -582,7 +609,7 @@ $('#fileOne').onchange=async e=>{
     a.full=p.full; a.thumb=p.thumb; a._fullUrl=null; a._thumbUrl=null;
     a.filename=f.name; a.orientation=p.orientation; urlsFor(a);
     await dbPut(strip(a));
-    if(sbOn()) await sbPush(a);
+    if(canWrite()) await sbPush(a);
     openEditor(a); toast('Picture replaced');
   }catch(err){ toast("Couldn't read that image"); }
   progress(1);
@@ -652,7 +679,7 @@ $('#fileJson').onchange=e=>{
 };
 $('#clearBtn').onclick=async()=>{
   if(!ART.length){ toast('Already empty'); return; }
-  const cloud=sbOn();
+  const cloud=canWrite();
   const where = cloud
     ? 'This removes them from this browser and from the cloud library, including the uploaded image files. Visitors lose them straight away.'
     : 'This removes them from this browser only.';
@@ -681,14 +708,70 @@ $('#forgetBtn').onclick=async()=>{
 /* =====================================================================
    SUPABASE
    ===================================================================== */
-const SB={url:'',anon:''};
+const SB={url:'',anon:'',token:null,refresh:null,expires:0,email:''};
 let sbLive=false;
-const sbOn=()=>!!(SB.url&&SB.anon);
+const sbOn=()=>!!(SB.url&&SB.anon);          // enough to read
+const canWrite=()=>!!SB.token;               // signed in
 const base=()=>SB.url.replace(/\/+$/,'');
 const BUCKET='gallery';
-const hdr=x=>Object.assign({apikey:SB.anon,Authorization:'Bearer '+SB.anon},x||{});
+const hdr=x=>Object.assign({apikey:SB.anon,Authorization:'Bearer '+(SB.token||SB.anon)},x||{});
 function saveCfg(){ try{ localStorage.setItem(CFG_KEY,JSON.stringify({url:SB.url,anon:SB.anon})); }catch(e){} }
+
+/* The token, not the password, is what gets kept — in sessionStorage, so
+   it is gone the moment the tab closes. */
+function setSession(j){
+  SB.token=j.access_token; SB.refresh=j.refresh_token||SB.refresh;
+  SB.expires=Date.now()+((j.expires_in||3600)-180)*1000;
+  SB.email=(j.user&&j.user.email)||SB.email;
+  try{ sessionStorage.setItem(SESS_KEY,JSON.stringify(
+    {token:SB.token,refresh:SB.refresh,expires:SB.expires,email:SB.email})); }catch(e){}
+}
+function clearSession(){
+  SB.token=SB.refresh=null; SB.expires=0;
+  try{ sessionStorage.removeItem(SESS_KEY); }catch(e){}
+}
+function restoreSession(){
+  try{
+    const j=JSON.parse(sessionStorage.getItem(SESS_KEY)||'null');
+    if(j&&j.refresh){ Object.assign(SB,{token:j.token,refresh:j.refresh,expires:j.expires,email:j.email}); return true; }
+  }catch(e){}
+  return false;
+}
+async function sbSignIn(email,pass){
+  let r,j;
+  try{
+    r=await fetch(base()+'/auth/v1/token?grant_type=password',{
+      method:'POST', headers:{apikey:SB.anon,'Content-Type':'application/json'},
+      body:JSON.stringify({email,password:pass})});
+    j=await r.json().catch(()=>({}));
+  }catch(e){ throw new Error('Cannot reach the cloud library.'); }
+  if(!r.ok||!j.access_token){
+    const m=j.error_description||j.msg||j.message||'';
+    throw new Error(/credential|grant|invalid/i.test(m)?'Wrong email or password.':(m||'Sign in failed.'));
+  }
+  SB.email=email; setSession(j);
+}
+/* An access token lasts an hour. Renew it quietly rather than throwing the
+   curator out in the middle of an upload. */
+async function fresh(){
+  if(!SB.token) return false;
+  if(Date.now()<SB.expires) return true;
+  if(!SB.refresh){ clearSession(); return false; }
+  try{
+    const r=await fetch(base()+'/auth/v1/token?grant_type=refresh_token',{
+      method:'POST', headers:{apikey:SB.anon,'Content-Type':'application/json'},
+      body:JSON.stringify({refresh_token:SB.refresh})});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok||!j.access_token) throw new Error('expired');
+    setSession(j); return true;
+  }catch(e){
+    clearSession(); sbStatus();
+    closeGate('Your session expired. Sign in again — nothing has been lost.');
+    return false;
+  }
+}
 function loadCfg(){
+  if(loadCfg.done) return; loadCfg.done=true;
   SB.url=CLOUD.url; SB.anon=CLOUD.anon;
   try{ const c=JSON.parse(localStorage.getItem(CFG_KEY)||'null');
        if(c&&c.url&&c.anon){ SB.url=c.url; SB.anon=c.anon; } }catch(e){}
@@ -699,8 +782,10 @@ function sbStatus(msg){
   $('#sbDot').className='dot'+(sbLive?' live':'');
   $('#sbSub').textContent = msg || (!sbOn()
     ? 'No project set. Artwork lives only in this browser.'
-    : (sbLive ? 'Connected. Every change you make here goes live for visitors straight away.'
-              : 'Cannot reach the cloud library. Changes are being kept in this browser.'));
+    : !sbLive ? 'Cannot reach the cloud library. Changes are being kept in this browser.'
+    : canWrite() ? ('Signed in as '+(SB.email||'curator')+'. Every change goes live straight away.')
+                 : 'Working offline. Nothing is reaching the cloud — sign in to publish.');
+  $('#signOut').style.display=canWrite()?'':'none';
 }
 /* One read to see whether the library is reachable. */
 async function sbProbe(){
@@ -716,12 +801,12 @@ async function upBlob(name,blob){
   const r=await fetch(base()+'/storage/v1/object/'+BUCKET+'/'+name,{
     method:'POST', headers:hdr({'Content-Type':blob.type||'image/jpeg','x-upsert':'true'}), body:blob});
   if(!r.ok) throw new Error(r.status===401||r.status===403
-    ? 'the gallery bucket is refusing uploads — run the setup SQL again'
+    ? 'the gallery bucket refused the upload — your sign-in may have lapsed'
     : 'picture upload failed ('+r.status+')');
   return base()+'/storage/v1/object/public/'+BUCKET+'/'+name;
 }
 async function sbPush(a){
-  if(!sbOn()) return;
+  if(!canWrite()||!await fresh()) return;
   const v=Date.now();
   const row={ id:a.id, sort_order:a.sort_order||ART.indexOf(a)+1, filename:a.filename||'',
               title:a.title||'', artist:a.artist||'',
@@ -737,16 +822,17 @@ async function sbPush(a){
   if(!r.ok){
     const t=await r.text().catch(()=>'');
     throw new Error(r.status===401||r.status===403
-      ? 'the database is refusing writes — run the setup SQL again'
+      ? 'the database refused the write — your sign-in may have lapsed, or the setup SQL needs running again'
       : 'saving failed ('+r.status+') '+t.slice(0,120));
   }
   if(!sbLive){ sbLive=true; sbStatus(); }
 }
 async function sbDeleteRow(id){
+  if(!canWrite()||!await fresh()) return;
   try{ await fetch(base()+'/rest/v1/artworks?id=eq.'+id,{method:'DELETE',headers:hdr()}); }catch(e){}
 }
 async function sbDeleteFiles(ids){
-  if(!sbOn()||!ids.length) return;
+  if(!canWrite()||!ids.length||!await fresh()) return;
   const prefixes=[];
   ids.forEach(id=>prefixes.push('art-'+id+'-full.jpg','art-'+id+'-thumb.jpg'));
   try{
@@ -760,6 +846,10 @@ function releaseUrls(a){
   if(a.thumb&&a._thumbUrl) URL.revokeObjectURL(a._thumbUrl);
   a._fullUrl=a._thumbUrl=null;
 }
+$('#signOut').onclick=()=>{
+  clearSession(); sbStatus();
+  closeGate('Signed out.');
+};
 $('#advBtn').onclick=()=>{
   const a=$('#adv'); const on=a.style.display==='none';
   a.style.display=on?'block':'none';
@@ -772,7 +862,7 @@ $('#sbConnect').onclick=async()=>{
   toast(sbLive?'Connected':'Saved, but the library did not answer',5000);
 };
 $('#sbPush').onclick=async()=>{
-  if(!sbOn()){ toast('No cloud project set'); return; }
+  if(!canWrite()){ toast('Sign in first — reload the page to sign in'); return; }
   if(!ART.length){ toast('Nothing to upload'); return; }
   reorder();
   for(let i=0;i<ART.length;i++){
@@ -829,7 +919,9 @@ const SQL=[
 'drop policy if exists "gallery read" on artworks;',
 'drop policy if exists "gallery write" on artworks;',
 'create policy "gallery read"  on artworks for select using (true);',
-'create policy "gallery write" on artworks for all using (true) with check (true);','',
+'-- only a signed-in curator may write; the public key can only read',
+'create policy "gallery write" on artworks for all to authenticated',
+'  using (true) with check (true);','',
 'insert into storage.buckets (id, name, public)',
 "values ('gallery', 'gallery', true)",
 'on conflict (id) do nothing;',
@@ -840,9 +932,13 @@ const SQL=[
 'create policy "gallery files read"  on storage.objects',
 "  for select using (bucket_id = 'gallery');",
 'create policy "gallery files write" on storage.objects',
-"  for all using (bucket_id = 'gallery') with check (bucket_id = 'gallery');",'',
-'-- No Supabase user account is needed. The dashboard writes with the',
-'-- public key, so keep the dashboard address to yourself.'
+'  for all to authenticated',
+"  using (bucket_id = 'gallery') with check (bucket_id = 'gallery');",'',
+'-- Then create your curator account:',
+'--   Authentication -> Users -> Add user',
+'--   enter an email and password, tick Auto Confirm User.',
+'-- That password is what the dashboard asks for. It is never stored in',
+'-- any file, and without it the published key can only read.'
 ].join('\n');
 $('#sqlBtn').onclick=()=>{
   const b=$('#sql'); b.textContent=SQL; b.classList.toggle('on');
@@ -867,9 +963,11 @@ async function boot(){
   if(sbLive && !hasOriginals) $('#sbPull').click();
   if(!storageOK) toast('This browser is blocking local storage — work from one device, or export often',7000);
 }
-let opened=false;
-try{ opened=sessionStorage.getItem(GATE_KEY)==='1'; }catch(e){}
-if(opened) openGate(); else setTimeout(()=>$('#gatePass').focus(),120);
+loadCfg();
+try{ $('#gateMail').value=localStorage.getItem('shator-mail')||''; }catch(e){}
+/* A reload inside the same tab keeps the session; closing the tab ends it. */
+if(restoreSession()) openGate();
+else setTimeout(()=>$(($('#gateMail').value?'#gatePass':'#gateMail')).focus(),120);
 </script>
 </body>
 </html>
