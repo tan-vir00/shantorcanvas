@@ -23,21 +23,44 @@ button{font-family:inherit;cursor:pointer}
 #fatal{position:fixed;inset:0;z-index:99;display:none;background:#140e0e;color:#f3d9d9;
   padding:28px 22px;font:13px/1.7 ui-monospace,Menlo,monospace;overflow:auto}
 #blocker{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;
-  background:radial-gradient(120% 90% at 50% 40%,#1b1611 0%,#0a0806 70%);color:var(--text);
-  text-align:center;padding:24px;cursor:pointer}
-#entry{max-width:460px}
-#logo{width:min(320px,72vw);height:auto;display:block;margin:0 auto 18px;
-  filter:drop-shadow(0 6px 26px rgba(216,184,120,.22))}
-#tagline{font-family:var(--serif);font-style:italic;font-size:17px;color:#bdb3a2;letter-spacing:.06em;margin:0 0 6px}
-#count{font-size:11.5px;color:var(--muted);letter-spacing:.14em;margin:0 0 24px}
+  background:
+    radial-gradient(130% 95% at 50% 16%, #241d15 0%, #17120d 42%, #0a0806 100%);
+  color:var(--text);text-align:center;padding:26px;cursor:pointer;overflow:hidden}
+/* a slow warmth behind the logo, like light through a high window */
+#blocker::before{content:'';position:absolute;inset:-25%;pointer-events:none;
+  background:radial-gradient(closest-side at 50% 40%, rgba(216,184,120,.16), rgba(216,184,120,.04) 55%, transparent 72%);
+  animation:breathe 15s ease-in-out infinite}
+#blocker::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(115% 85% at 50% 45%, transparent 55%, rgba(6,5,4,.7) 100%)}
+@keyframes breathe{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.14);opacity:1}}
+#entry{max-width:430px;position:relative;z-index:1;
+  animation:rise 1.2s cubic-bezier(.2,.7,.25,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+#logo{width:min(300px,68vw);height:auto;display:block;margin:0 auto 20px;
+  filter:drop-shadow(0 8px 34px rgba(216,184,120,.26))}
+#tagline{font-family:var(--serif);font-style:italic;font-size:18px;color:#c6bcab;letter-spacing:.05em;margin:0 0 8px}
+#count{font-size:11px;color:var(--muted);letter-spacing:.16em;margin:0 0 28px}
 #enterBtn{background:transparent;border:1px solid var(--brass);color:var(--brass);
-  padding:13px 34px;border-radius:2px;font-size:13px;letter-spacing:.14em;transition:background .25s,color .25s}
-#enterBtn:hover{background:var(--brass);color:#14100c}
-#howto{font-size:12.5px;color:var(--muted);line-height:1.9;margin:22px 0 0}
+  padding:14px 38px;border-radius:2px;font-size:13px;letter-spacing:.16em;
+  transition:background .3s,color .3s,box-shadow .3s}
+#enterBtn:hover{background:var(--brass);color:#14100c;box-shadow:0 6px 26px rgba(216,184,120,.28)}
+
+/* the three things people need to know, spelled out plainly */
+#howto{margin:30px auto 0;max-width:330px;display:flex;flex-direction:column;gap:13px;text-align:left}
+.step{display:flex;gap:14px;align-items:baseline}
+.step b{flex:0 0 58px;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--brass);font-weight:600;padding-top:1px}
+.step em{font-style:normal;font-size:12.5px;line-height:1.65;color:#aaa091;letter-spacing:.02em}
+.step kbd{margin:0 1px}
+
+#visitors{margin:28px 0 0;font-size:10.5px;letter-spacing:.16em;color:#6b6356;
+  opacity:0;transition:opacity 1s ease .3s}
+#visitors.on{opacity:1}
+#visitors b{color:#9b8f76;font-weight:600;letter-spacing:.1em}
 #emptyNote{display:none;font-size:12.5px;color:#c9b489;line-height:1.7;margin:18px auto 0;max-width:330px}
 #emptyNote a{color:var(--brass)}
 kbd{background:#241e18;border:1px solid #453a2c;border-radius:3px;padding:1px 6px;font-size:11px;color:#cdbfa8}
-#loadbar{height:2px;width:100%;max-width:280px;margin:22px auto 0;background:#2a231b;overflow:hidden}
+#loadbar{height:1px;width:100%;max-width:230px;margin:26px auto 0;background:#241e17;overflow:hidden}
 #loadbar i{display:block;height:100%;width:0;background:var(--brass);transition:width .3s}
 #curatorLink{display:none;margin-top:20px;font-size:11px;letter-spacing:.12em;color:#6b6358;text-decoration:none}
 #curatorLink:hover{color:var(--brass)}
@@ -82,16 +105,26 @@ kbd{background:#241e18;border:1px solid #453a2c;border-radius:3px;padding:1px 6p
   background:rgba(216,184,120,.09);border:1.5px solid rgba(216,184,120,.35)}
 #joyKnob{position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;
   background:rgba(216,184,120,.45);top:54px;left:54px}
-#walkHint{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 70px);z-index:14;
-  text-align:center;color:rgba(239,232,218,.7);font-size:12px;letter-spacing:.06em;
-  pointer-events:none;opacity:0;transition:opacity .4s}
-#walkHint.on{opacity:1}
+/* Ten seconds of guidance in the corner, because the entrance screen is
+   read once and then forgotten the moment the gallery opens. */
+#walkHint{position:fixed;left:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);z-index:14;
+  max-width:250px;text-align:left;pointer-events:none;
+  opacity:0;transform:translateY(8px);transition:opacity .7s ease,transform .7s ease;
+  background:rgba(10,8,6,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border:1px solid var(--brass-dim);border-left:2px solid var(--brass);
+  padding:12px 15px;border-radius:3px;
+  color:#cdc5b7;font-size:12px;line-height:1.75;letter-spacing:.02em}
+#walkHint.on{opacity:1;transform:none}
+#walkHint b{display:block;color:var(--brass);font-size:9.5px;letter-spacing:.18em;
+  text-transform:uppercase;font-weight:600;margin-bottom:6px}
+#walkHint i{font-style:normal;color:#f0e8da;font-weight:600}
 
 @media (max-width:640px),(pointer:coarse){
   #crosshair{display:none}
   #mini{width:96px;height:96px}
   #roomName{max-width:96px}
-  #tagline{font-size:14px}
+  #tagline{font-size:15px}
+  #walkHint{max-width:210px;font-size:11.5px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px)}
   #caption h3{font-size:17px}
 }
 @media (prefers-reduced-motion:reduce){*{transition-duration:.01ms !important}}
@@ -111,9 +144,10 @@ kbd{background:#241e18;border:1px solid #453a2c;border-radius:3px;padding:1px 6p
     <p id="tagline">Winners first, then every room.</p>
     <p id="count">Opening…</p>
     <button id="enterBtn">Enter the gallery</button>
-    <p id="howto"></p>
+    <div id="howto"></div>
     <p id="emptyNote">No artwork has been hung yet.<br><a href="admin.html">Open the curator dashboard</a> to upload your first pictures.</p>
     <div id="loadbar"><i></i></div>
+    <p id="visitors"></p>
     <a id="curatorLink" href="admin.html">Curator dashboard</a>
   </div>
 </div>
@@ -135,7 +169,7 @@ kbd{background:#241e18;border:1px solid #453a2c;border-radius:3px;padding:1px 6p
 </div>
 
 <div id="joyZone"><div id="joyBase"><div id="joyKnob"></div></div></div>
-<div id="walkHint">left half walks · right half looks</div>
+<div id="walkHint"></div>
 
 <script>
 /* Some embedded viewers ship a partial console. Fill the gaps before any
@@ -411,6 +445,40 @@ const CLOUD={
   anon:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZvaWdka21vY2xqbmN1ZmZwdXpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NjI5NjgsImV4cCI6MjEwNTEzODk2OH0.s65lyNPA84NguafjqUl-ihp700BuFitqLn729DRq-Gs'
 };
 let db=null, ART=[];
+
+/* ---------- visitors ----------
+   The number lives in one row in the cloud and is nudged up by a function
+   that can do nothing else, so counting a visit never means opening the
+   gallery to writes. A browser counts once every six hours, so a reload
+   or a second look on the same evening is not a second visitor. */
+const VISIT_KEY='shator-visited';
+async function countVisit(){
+  const el=document.querySelector('#visitors');
+  const cfg=readCfg();
+  if(!el||!cfg||!cfg.url||!cfg.anon) return;
+  let bump=true;
+  try{
+    const last=Number(localStorage.getItem(VISIT_KEY)||0);
+    if(Date.now()-last < 6*3600*1000) bump=false;
+  }catch(e){}
+  try{
+    const base=cfg.url.replace(/\/+$/,'');
+    const ctl=('AbortController' in window)?new AbortController():null;
+    const bail=setTimeout(()=>ctl&&ctl.abort(),7000);
+    const r=await fetch(base+'/rest/v1/rpc/visit_count',{
+      method:'POST',
+      headers:{ apikey:cfg.anon, Authorization:'Bearer '+cfg.anon, 'Content-Type':'application/json' },
+      body:JSON.stringify({bump:bump}),
+      signal:ctl?ctl.signal:undefined});
+    clearTimeout(bail);
+    if(!r.ok) return;                       // setup SQL not run yet: stay quiet
+    const n=await r.json();
+    if(typeof n!=='number'||!(n>0)) return;
+    el.innerHTML='<b>'+n.toLocaleString()+'</b> &nbsp;visitors so far';
+    el.classList.add('on');
+    if(bump){ try{ localStorage.setItem(VISIT_KEY,String(Date.now())); }catch(e){} }
+  }catch(e){}
+}
 
 function openDB(){
   return new Promise(res=>{
@@ -929,7 +997,12 @@ function startExperience(){
   if(started) return;
   started=true;
   blocker.style.display='none';
-  if(IS_TOUCH){ const h=$('#walkHint'); h.classList.add('on'); setTimeout(()=>h.classList.remove('on'),4200); }
+  const h=$('#walkHint');
+  h.innerHTML='<b>How to move</b>'+(IS_TOUCH
+    ? 'Drag the <i>left</i> half to walk<br>Drag the <i>right</i> half to look<br>Tap the plan, top right, to travel'
+    : '<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to walk<br>Move the mouse to look<br><kbd>M</kbd> for the floor plan');
+  h.classList.add('on');
+  setTimeout(()=>h.classList.remove('on'),10000);
 }
 function enterNow(){
   startExperience();
@@ -937,9 +1010,14 @@ function enterNow(){
 }
 function initControls(){
   blocker=$('#blocker');
+  const step=(k,t)=>'<span class="step"><b>'+k+'</b><em>'+t+'</em></span>';
   $('#howto').innerHTML=IS_TOUCH
-    ? 'Drag the left half to walk<br>Drag the right half to look around<br>Tap the plan to jump between rooms'
-    : '<kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> to walk · mouse to look<br><kbd>Shift</kbd> to hurry · <kbd>M</kbd> for the plan';
+    ? step('Walk','Drag anywhere on the left half of the screen')
+    + step('Look','Drag anywhere on the right half')
+    + step('Travel','Tap the floor plan, top right, then tap any room to go straight there')
+    : step('Walk','<kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or the arrow keys · hold <kbd>Shift</kbd> to hurry')
+    + step('Look','Move the mouse, or drag with it held down')
+    + step('Travel','Press <kbd>M</kbd> for the floor plan, then click any room');
   $('#enterBtn').addEventListener('click',e=>{ e.stopPropagation(); enterNow(); });
   blocker.addEventListener('click',enterNow);
   blocker.addEventListener('touchend',e=>{ if(e.cancelable) e.preventDefault(); enterNow(); },{passive:false});
@@ -1235,6 +1313,7 @@ addEventListener('resize',()=>{
 (async function(){
   try{
     const bar=$('#loadbar i'); bar.style.width='30%';
+    countVisit();
     ART=await loadArtworks();
     bar.style.width='60%';
     if(!ART.length){
