@@ -493,17 +493,32 @@ async function loadArtworks(){
 /* =====================================================================
    SCENE
    ===================================================================== */
-let scene,camera,renderer,LAY,WORLD,REGIONS=[],SLOTS=[],orb=null,basePR=1;
+let scene,camera,renderer,LAY,WORLD,REGIONS=[],SLOTS=[],orb=null,basePR=1,maxPR=1,lowRuns=0;
 
+/* Sharpen a texture seen at an angle. Without this the floor and the wall
+   labels dissolve into shimmer as soon as you start walking. */
+let MAXANISO=1;
+function sharpen(t,mips){
+  t.anisotropy=Math.min(16,MAXANISO);
+  if(mips!==false){ t.generateMipmaps=true; t.minFilter=THREE.LinearMipmapLinearFilter; }
+  t.magFilter=THREE.LinearFilter;
+  t.needsUpdate=true;
+  return t;
+}
 function initRenderer(){
   scene=new THREE.Scene();
   scene.background=new THREE.Color(0x0b0a09);
   scene.fog=new THREE.Fog(0x0b0a09,36,110);
   camera=new THREE.PerspectiveCamera(72,innerWidth/innerHeight,0.1,200);
   camera.rotation.order='YXZ';
-  renderer=new THREE.WebGLRenderer({antialias:!IS_TOUCH,powerPreference:'high-performance'});
-  basePR=Math.min(devicePixelRatio,2);
+  /* Antialiasing used to be switched off on anything with a touch screen,
+     which is why frame edges came out as staircases on a phone. The scene
+     is only a few hundred triangles; a phone can afford it. */
+  renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
+  maxPR=Math.min(devicePixelRatio||1,2);
+  basePR=maxPR;
   renderer.setPixelRatio(basePR);
+  MAXANISO=renderer.capabilities.getMaxAnisotropy()||1;
   renderer.setSize(innerWidth,innerHeight);
   renderer.outputEncoding=THREE.sRGBEncoding;
   renderer.toneMapping=THREE.ACESFilmicToneMapping;
@@ -553,6 +568,7 @@ function initMaterials(){
   g.globalAlpha=1; g.strokeStyle='rgba(120,112,98,.35)'; g.lineWidth=2; g.strokeRect(0,0,256,256);
   const t=new THREE.CanvasTexture(c);
   t.wrapS=t.wrapT=THREE.RepeatWrapping; t.encoding=THREE.sRGBEncoding; t.repeat.set(30,30);
+  sharpen(t);
   M.floor=new THREE.MeshStandardMaterial({map:t,roughness:.32,metalness:.12,envMapIntensity:.85});
 }
 
@@ -592,6 +608,7 @@ function addLamp(x,z,room,y,warm){
    Painted signage, rendered once to a canvas. Unlit so it stays crisp
    and readable from across a room.                                   */
 function addSign(sg){
+  /* drawn at canvas resolution, then filtered properly on the way to the wall */
   const cv=document.createElement('canvas'); cv.width=1024; cv.height=Math.round(1024*sg.h/sg.w);
   const g=cv.getContext('2d'), H=cv.height;
   g.fillStyle='#0f0d0b'; g.fillRect(0,0,1024,H);
@@ -603,7 +620,7 @@ function addSign(sg){
     g.fillStyle=sg.accent; g.font=Math.round(H*0.17)+'px system-ui,sans-serif';
     g.fillText(sg.sub,512,H*0.80);
   }
-  const tex=new THREE.CanvasTexture(cv); tex.encoding=THREE.sRGBEncoding;
+  const tex=new THREE.CanvasTexture(cv); tex.encoding=THREE.sRGBEncoding; sharpen(tex);
   const m=new THREE.Mesh(new THREE.PlaneGeometry(sg.w,sg.h),
     new THREE.MeshBasicMaterial({map:tex,toneMapped:false}));
   m.position.set(sg.x,sg.y,sg.z); m.rotation.y=sg.rotY;
@@ -752,8 +769,7 @@ function makePlaque(slot){
   }
   const tex=new THREE.CanvasTexture(cv);
   tex.encoding=THREE.sRGBEncoding;
-  tex.needsUpdate=true;
-  return tex;
+  return sharpen(tex);
 }
 function resizeFrame(s,aspect){
   let w=Math.min(s.maxW,s.maxH*aspect), h=w/aspect;
@@ -797,7 +813,11 @@ function mountFrame(p,art,index){
 
 /* ---------- distance-based texture streaming ---------- */
 const texLoader=new THREE.TextureLoader(); texLoader.crossOrigin='anonymous';
-const D_FULL=15, D_THUMB=36, D_DROP=50, D_PLAQUE=17;
+/* The small copy is 440px wide, so swapping to it at 15m was visible as a
+   picture going soft the moment you backed away from it. */
+const D_FULL=26, D_THUMB=40, D_DROP=56, D_PLAQUE=19;
+const FULL_BUDGET=12;
+const near=[];
 function applyTex(s,level){
   const a=s.artwork;
   const src = level===2 ? (a.fullUrl||a.thumbUrl) : (a.thumbUrl||a.fullUrl);
@@ -806,8 +826,7 @@ function applyTex(s,level){
   texLoader.load(src,tex=>{
     s.loading=false;
     tex.encoding=THREE.sRGBEncoding;
-    tex.minFilter=THREE.LinearMipmapLinearFilter; tex.generateMipmaps=true;
-    tex.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());
+    sharpen(tex);
     if(s.tex) s.tex.dispose();
     s.tex=tex; s.level=level;
     s.artMat.map=tex; s.artMat.color.set(0xffffff); s.artMat.needsUpdate=true;
@@ -823,22 +842,37 @@ function dropTex(s){
 let queue=[];
 function updateStreaming(){
   const cx=camera.position.x, cz=camera.position.z;
-  queue.length=0;
+  queue.length=0; near.length=0;
   for(const s of SLOTS){
-    const d=Math.hypot(s.x-cx,s.z-cz);
+    s._d=Math.hypot(s.x-cx,s.z-cz);
+    if(s._d<D_FULL) near.push(s);
+  }
+  /* A 1600px picture costs roughly 10MB of video memory once mipmapped, so
+     only the closest few are held at that size. Beyond that the small copy
+     is indistinguishable anyway, and a phone browser that runs out of
+     memory simply drops the tab. */
+  near.sort((a,b)=>a._d-b._d);
+  near.forEach((s,i)=>{ s._rank=i; });
+  for(const s of SLOTS){
+    const d=s._d;
     if(d<D_PLAQUE && !s.plaque.visible){
       s.plaque.material.map=makePlaque(s); s.plaque.material.needsUpdate=true; s.plaque.visible=true;
     }else if(d>D_PLAQUE+8 && s.plaque.visible){
       if(s.plaque.material.map){ s.plaque.material.map.dispose(); s.plaque.material.map=null; }
       s.plaque.visible=false;
     }
-    const want = d<D_FULL?2 : d<D_THUMB?1 : d<D_DROP?(s.level||1) : 0;
+    const rank=(d<D_FULL)?s._rank:1e9;
+    /* the four extra places stop a picture flickering between sizes as
+       you drift back and forth across the edge of the budget */
+    const full = rank<FULL_BUDGET || (s.level===2 && rank<FULL_BUDGET+4);
+    const want = full?2 : d<D_THUMB?1 : d<D_DROP?(s.level||1) : 0;
     if(want===0){ if(s.level) dropTex(s); continue; }
-    if(want>s.level && !s.loading) queue.push({s,level:want,d});
+    if(want!==s.level && !s.loading) queue.push({s,level:want,d:want>s.level?d:d+1000});
   }
   queue.sort((a,b)=>a.d-b.d);
   for(let i=0;i<2&&i<queue.length;i++) applyTex(queue[i].s,queue[i].level);
 }
+
 
 /* =====================================================================
    CONTROLS
@@ -1140,12 +1174,23 @@ function animate(){
   if(acc>.22){ acc=0; updateStreaming(); updateCaption(); drawMap(miniCtx,miniCv,false);
     $('#roomName').textContent=ROOM_META[roomAt(camera.position.x,camera.position.z)].name; }
   fr++; ft+=dt;
-  if(ft>2){ const fps=fr/ft; fr=0; ft=0;
-    if(fps<32&&basePR>1){ basePR=Math.max(1,basePR-.25); renderer.setPixelRatio(basePR); } }
+  if(ft>2){
+    const fps=fr/ft; fr=0; ft=0;
+    /* This used to be a one-way ratchet: a single slow patch — a room's
+       worth of pictures arriving, say — dropped the resolution for good,
+       and the gallery stayed coarse for the rest of the visit. It now
+       climbs back as soon as there is room for it, and needs two slow
+       spells in a row before it gives anything up. */
+    if(fps<30){ if(++lowRuns>=2 && basePR>1){ basePR=Math.max(1,basePR-.25); renderer.setPixelRatio(basePR); lowRuns=0; } }
+    else{ lowRuns=0;
+      if(fps>52 && basePR<maxPR){ basePR=Math.min(maxPR,basePR+.25); renderer.setPixelRatio(basePR); } }
+  }
   renderer.render(scene,camera);
 }
 addEventListener('resize',()=>{
   camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  maxPR=Math.min(devicePixelRatio||1,2);
+  renderer.setPixelRatio(basePR=Math.min(basePR,maxPR));
   renderer.setSize(innerWidth,innerHeight);
 });
 
